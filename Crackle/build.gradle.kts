@@ -1,0 +1,26 @@
+// Use an integer for version numbers
+version = 1
+
+cloudstream {
+    iconUrl = "https://www.google.com/s2/favicons?domain=crackle.beauty&sz=%size%"
+    description = "Crackle (crackle.beauty): movies and TV series from the TMDB catalogue, streamed via VixSrc"
+    authors = listOf("cloudstream-asian")
+
+    /**
+    * Status int as one of the following:
+    * 0: Down
+    * 1: Ok
+    * 2: Slow
+    * 3: Beta-only
+    **/
+    status = 1
+
+    tvTypes = listOf("Movie", "TvSeries")
+
+    language = "en"
+}
+
+dependencies {
+    // Provided by the CloudStream app at runtime; needed here only to compile the Mutex.
+    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
+}

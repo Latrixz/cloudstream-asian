@@ -1,0 +1,12 @@
+package com.huavod
+
+import android.content.Context
+import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
+import com.lagradost.cloudstream3.plugins.Plugin
+
+@CloudstreamPlugin
+class HuavodPlugin : Plugin() {
+    override fun load(context: Context) {
+        registerMainAPI(HuavodProvider())
+    }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "CloudStream Asian",
+  "description": "Chinese and Asian drama sources, plus English sources: movies, series, variety, anime and short dramas.",
+  "manifestVersion": 1,
+  "pluginLists": [
+    "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/plugins.json"
+  ]
+}
