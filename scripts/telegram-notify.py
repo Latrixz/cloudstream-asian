@@ -8,6 +8,7 @@ Posts nothing when no source changed (README or CI-only commits stay quiet).
 import json
 import os
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -65,10 +66,41 @@ lines += ["", "CloudStream updates installed sources automatically. New sources:
           "Repo: csasian · https://github.com/Latrixz/cloudstream-asian"]
 text = "\n".join(lines)
 
+# Screenshots: screenshots/<internalName>/v<version>*.png|jpg in this commit are posted as an album.
+shots_dir = os.environ.get("SCREENSHOTS_DIR", "")
+sha = os.environ.get("GITHUB_SHA", "code")
+photos = []
+for p in added + [n for _, n in updated]:
+    folder = os.path.join(shots_dir, p["internalName"]) if shots_dir else ""
+    if not folder or not os.path.isdir(folder):
+        continue
+    prefix = f"v{p.get('version')}"
+    for f in sorted(os.listdir(folder)):
+        if f.startswith(prefix) and f.lower().endswith((".png", ".jpg", ".jpeg")):
+            photos.append((label(p), f"https://raw.githubusercontent.com/Latrixz/cloudstream-asian/{sha}/screenshots/{p['internalName']}/{f}"))
+photos = photos[:10]  # Telegram albums hold at most 10 items
+
 token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_CHAT", "@csasian")
 if not token:
     print("TELEGRAM_BOT_TOKEN not set; message would be:\n" + text)
+    for name, url in photos:
+        print("photo:", name, url)
     sys.exit(0)
-data = urllib.parse.urlencode({"chat_id": chat, "text": text, "disable_web_page_preview": "true"}).encode()
-with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/sendMessage", data=data, timeout=30) as r:
-    print("Telegram:", json.load(r).get("ok"))
+
+
+def call(method, params):
+    data = urllib.parse.urlencode(params).encode()
+    try:
+        with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/{method}", data=data, timeout=60) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        return json.load(e)
+
+
+r = call("sendMessage", {"chat_id": chat, "text": text, "disable_web_page_preview": "true"})
+print("Telegram:", r.get("ok"), r.get("description", ""))
+if photos:
+    media = [{"type": "photo", "media": url, **({"caption": f"📸 {name}"} if i == 0 or name != photos[i - 1][0] else {})}
+             for i, (name, url) in enumerate(photos)]
+    r = call("sendMediaGroup", {"chat_id": chat, "media": json.dumps(media)})
+    print("Screenshots:", r.get("ok"), r.get("description", ""))
