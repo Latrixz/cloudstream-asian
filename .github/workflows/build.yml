@@ -44,7 +44,7 @@ jobs:
           cd $GITHUB_WORKSPACE/src
           chmod +x gradlew
           ./gradlew make makePluginsJson
-          cp **/build/*.cs3 $GITHUB_WORKSPACE/builds
+          cp sources/*/build/*.cs3 $GITHUB_WORKSPACE/builds
           # The gradle plugin links to a "builds" branch; this repo publishes to "main".
           sed 's#/builds/#/main/#g' build/plugins.json > $GITHUB_WORKSPACE/builds/plugins.json
           cp repo.json $GITHUB_WORKSPACE/builds
