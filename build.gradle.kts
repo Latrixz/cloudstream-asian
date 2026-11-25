@@ -44,6 +44,9 @@ subprojects {
     android {
         namespace = "com.cloudstreamasian"
 
+        // Code shared by every source (backup links), compiled into each plugin.
+        sourceSets.getByName("main").java.srcDir(rootProject.file("shared"))
+
         defaultConfig {
             minSdk = 21
             compileSdkVersion(35)
@@ -83,6 +86,9 @@ subprojects {
         // IMPORTANT: Do not bump Jackson above 2.13.1, as newer versions will
         // break compatibility on older Android devices.
         implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1") // JSON Parser
+        // Provided by the app at runtime; the shared backup code needs it to compile.
+        val compileOnly by configurations
+        compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
     }
 }
 

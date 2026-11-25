@@ -1,5 +1,7 @@
 package com.mvffm
 
+import com.csasian.shared.CsBackup
+
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
@@ -94,7 +96,19 @@ class MvffmProvider : MainAPI() {
         return results.distinctBy { it.url } to hasNext
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    override suspend fun load(url: String): LoadResponse = loadPage(url).also { CsBackup.remember(this, it) }
+
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit,
+    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    }
+
+    private suspend fun loadPage(url: String): LoadResponse {
         val document = app.get(url, headers = browserHeaders).document
         val header = document.selectFirst(".sheader") ?: throw ErrorLoadingException("找不到影片資訊")
         val title = header.selectFirst(".data h1")?.text()?.trim().orEmpty()
@@ -188,7 +202,7 @@ class MvffmProvider : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
+    private suspend fun loadOwnLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,

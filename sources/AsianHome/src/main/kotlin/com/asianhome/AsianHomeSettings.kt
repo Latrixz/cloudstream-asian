@@ -140,6 +140,7 @@ class AsianHomeSettings(
                 clearAll()
             }
         }
+        bar.addView(pillButton("片源状态 Status", primary = false) { AsianHomeStatus(context, selfName).show() })
         bar.addView(clearButton)
         bar.addView(pillButton("取消 Cancel", primary = false) { dialog.dismiss() })
         bar.addView(pillButton("保存 Save", primary = true) { save() })

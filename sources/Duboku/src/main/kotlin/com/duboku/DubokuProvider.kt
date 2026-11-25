@@ -1,5 +1,7 @@
 package com.duboku
 
+import com.csasian.shared.CsBackup
+
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
@@ -166,7 +168,19 @@ class DubokuProvider : MainAPI() {
         return results.distinctBy { it.url } to (current < last)
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    override suspend fun load(url: String): LoadResponse = loadPage(url).also { CsBackup.remember(this, it) }
+
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit,
+    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    }
+
+    private suspend fun loadPage(url: String): LoadResponse {
         val document = getDocument(url)
         val detail = document.selectFirst(".myui-content__detail") ?: throw ErrorLoadingException("找不到影片信息")
         val title = detail.selectFirst("h1.title")?.text()?.trim().orEmpty()
@@ -255,7 +269,7 @@ class DubokuProvider : MainAPI() {
     private fun episodeData(entry: SourceEntry): String =
         "${entry.url}#ep=${URLEncoder.encode(normalizeEpisode(entry.name), "UTF-8")}"
 
-    override suspend fun loadLinks(
+    private suspend fun loadOwnLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,

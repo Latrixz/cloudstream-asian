@@ -1,5 +1,7 @@
 package com.framextv
 
+import com.csasian.shared.CsBackup
+
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
@@ -71,7 +73,19 @@ class FramextvProvider : MainAPI() {
         return toResults(json["results"], null) to hasNextPage(json, page)
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    override suspend fun load(url: String): LoadResponse = loadPage(url).also { CsBackup.remember(this, it) }
+
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit,
+    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    }
+
+    private suspend fun loadPage(url: String): LoadResponse {
         val m = TITLE_REGEX.find(url) ?: throw ErrorLoadingException("Invalid frameXTV URL: $url")
         val type = m.groupValues[1]
         val id = m.groupValues[2]
@@ -155,7 +169,7 @@ class FramextvProvider : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
+    private suspend fun loadOwnLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,

@@ -1,5 +1,7 @@
 package com.kubb
 
+import com.csasian.shared.CsBackup
+
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -102,7 +104,19 @@ class KubbProvider : MainAPI() {
         return response.data?.info?.firstOrNull() ?: SearchResult()
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    override suspend fun load(url: String): LoadResponse = loadPage(url).also { CsBackup.remember(this, it) }
+
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit,
+    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    }
+
+    private suspend fun loadPage(url: String): LoadResponse {
         val key = url.substringBefore('?').trimEnd('/').substringAfterLast('/')
         if (key.isBlank()) throw ErrorLoadingException("无效影片地址")
 
@@ -244,7 +258,7 @@ class KubbProvider : MainAPI() {
     private fun fullImage(raw: String): String? =
         raw.ifBlank { null }?.replace(Regex("""(/\d{15,})s(\.\w+)$"""), "$1$2")
 
-    override suspend fun loadLinks(
+    private suspend fun loadOwnLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,

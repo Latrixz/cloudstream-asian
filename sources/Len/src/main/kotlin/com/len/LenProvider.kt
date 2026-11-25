@@ -1,5 +1,7 @@
 package com.len
 
+import com.csasian.shared.CsBackup
+
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
@@ -108,7 +110,19 @@ class LenProvider : MainAPI() {
         return slice to (from + SEARCH_PAGE_SIZE < all.size)
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    override suspend fun load(url: String): LoadResponse = loadPage(url).also { CsBackup.remember(this, it) }
+
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit,
+    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    }
+
+    private suspend fun loadPage(url: String): LoadResponse {
         val (kind, id) = parseVodUrl(url) ?: throw ErrorLoadingException("无效影片地址")
         val detail = fetchDetail(kind, id)
         val isMovie = kind == "movie"
@@ -191,7 +205,7 @@ class LenProvider : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
+    private suspend fun loadOwnLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,

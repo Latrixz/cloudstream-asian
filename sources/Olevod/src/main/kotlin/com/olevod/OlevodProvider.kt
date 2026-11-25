@@ -1,5 +1,7 @@
 package com.olevod
 
+import com.csasian.shared.CsBackup
+
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -77,7 +79,19 @@ class OlevodProvider : MainAPI() {
         return results to (page * pageSize < (response.data?.total ?: 0) && items.isNotEmpty())
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    override suspend fun load(url: String): LoadResponse = loadPage(url).also { CsBackup.remember(this, it) }
+
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit,
+    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    }
+
+    private suspend fun loadPage(url: String): LoadResponse {
         val id = Regex("(?:details-\\d+-)?(\\d+)(?:\\.html)?$")
             .find(url.substringBefore('?'))
             ?.groupValues
@@ -144,7 +158,7 @@ class OlevodProvider : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
+    private suspend fun loadOwnLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,

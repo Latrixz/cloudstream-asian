@@ -1,5 +1,7 @@
 package com.kissasian
 
+import com.csasian.shared.CsBackup
+
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.extractors.MixDrop
 import com.lagradost.cloudstream3.extractors.Vidmoly
@@ -97,7 +99,19 @@ class KissasianProvider : MainAPI() {
         return results to (document.selectFirst("a.next.page-numbers") != null)
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    override suspend fun load(url: String): LoadResponse = loadPage(url).also { CsBackup.remember(this, it) }
+
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit,
+    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    }
+
+    private suspend fun loadPage(url: String): LoadResponse {
         var document = app.get(url, headers = siteHeaders).document
         var showUrl = url
         if (!url.contains("/series/")) {
@@ -217,7 +231,7 @@ class KissasianProvider : MainAPI() {
             ?: Regex("""Episode\s+(\d+)""", RegexOption.IGNORE_CASE).find(title)?.groupValues?.get(1)?.toIntOrNull()
             ?: Regex("""-episode-(\d+)""").find(url)?.groupValues?.get(1)?.toIntOrNull()
 
-    override suspend fun loadLinks(
+    private suspend fun loadOwnLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
