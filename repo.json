@@ -1,5 +1,6 @@
 {
   "name": "CloudStream Asian",
+  "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/logo-512.png",
   "description": "Chinese and Asian drama sources, plus English sources. Requests, updates and help: https://t.me/csasian",
   "manifestVersion": 1,
   "pluginLists": [
