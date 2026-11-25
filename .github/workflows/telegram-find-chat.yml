@@ -1,0 +1,24 @@
+name: Telegram find chat (temporary)
+on: workflow_dispatch
+permissions: {}
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    steps:
+      - name: List chats the bot has seen (id, type, title only)
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          curl -s "https://api.telegram.org/bot${TOKEN}/getUpdates?allowed_updates=%5B%22message%22,%22my_chat_member%22,%22channel_post%22%5D" \
+          | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          print('ok:',d.get('ok'),'| description:',d.get('description',''))
+          seen={}
+          for u in d.get('result',[]):
+              for k in ('message','my_chat_member','channel_post','edited_message'):
+                  c=(u.get(k) or {}).get('chat')
+                  if c: seen[c['id']]=(c.get('type'),c.get('title'))
+          for i,(t,ti) in seen.items(): print('CHAT', i, t, ti)
+          print('chats found:',len(seen))
+          "
