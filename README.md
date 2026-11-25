@@ -1,5 +1,7 @@
 # CloudStream Asian
 
+[![Telegram](https://img.shields.io/badge/Telegram-Join%20csasian-26A5E4?logo=telegram&logoColor=white)](https://t.me/csasian)
+
 A [CloudStream](https://github.com/recloudstream/cloudstream) extension repository with Chinese and Asian drama sources, plus English ones.
 
 ## Install
@@ -17,6 +19,14 @@ https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/repo.json
 ```
 
 Then open the repository and install the sources you want.
+
+## Community
+
+Join the Telegram group, **[t.me/csasian](https://t.me/csasian)**, to:
+
+- request new sources
+- hear when a site breaks or a new source is added
+- report broken links and get help
 
 ## Sources
 
