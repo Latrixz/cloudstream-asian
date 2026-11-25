@@ -1,0 +1,1189 @@
+[
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Aigua.png",
+        "fileHash": "sha256-e21c4f6504cbbdbacd864710e096393b396b412fbc2362c9ff1e94301ec005b3",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 222627,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama",
+            "Documentary"
+        ],
+        "version": 9,
+        "internalName": "Aigua",
+        "description": "\u7231\u74dcTV Aigua\uff08\u539f\u74dc\u5b50TV\uff09\uff1a\u7535\u5f71\u3001\u7535\u89c6\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u548c\u7eaa\u5f55\u7247\uff0c1080P \u65e0\u5e7f\u544a / Chinese movies, dramas, variety shows, anime and documentaries in ad-free 1080p",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Aigua.cs3",
+        "name": "Aigua"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/AniKoto.png",
+        "fileHash": "sha256-37e9387e14dfae98a0c56ce3f042a66ce6fbc1fc60d8b5b1eb57a9242c9863ee",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 242041,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Anime",
+            "AnimeMovie",
+            "OVA"
+        ],
+        "version": 8,
+        "internalName": "AniKoto",
+        "description": "AniKoto (anikototv.bz): anime and anime movies with English sub and dub, plus subtitles in several languages",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/AniKoto.cs3",
+        "name": "AniKoto"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Animenosub.png",
+        "fileHash": "sha256-4e8fd1c1ceaefe69b029205ce8d595c22b5273ec0e30e853e357d49724eeb644",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 274340,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Anime",
+            "AnimeMovie",
+            "OVA"
+        ],
+        "version": 2,
+        "internalName": "Animenosub",
+        "description": "Animenosub (animenosub.to): anime series and movies with English sub, English dub and raw, English dub listed first",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Animenosub.cs3",
+        "name": "Animenosub"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Animepahe.png",
+        "fileHash": "sha256-fede5c18f5fdffc16d58e864a733bfe5facc6d75f1d5f1a4d076a823a80eb87c",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 272278,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Anime",
+            "AnimeMovie",
+            "OVA"
+        ],
+        "version": 2,
+        "internalName": "Animepahe",
+        "description": "Animepahe (animepahe.ch): anime series and movies with English sub and some English dubs",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Animepahe.cs3",
+        "name": "Animepahe"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/AnimeSuge.png",
+        "fileHash": "sha256-d14e300d7a06af2c7f8931c7e95f0aba5931f1eaa2cc313811ed659859f3bbf1",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 242031,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Anime",
+            "AnimeMovie",
+            "OVA"
+        ],
+        "version": 8,
+        "internalName": "AnimeSuge",
+        "description": "AnimeSuge (animesuge.cz): anime and anime movies with English sub and dub, plus subtitles in several languages",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/AnimeSuge.cs3",
+        "name": "AnimeSuge"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/logo-512.png",
+        "fileHash": "sha256-e6c1562cb8d321fe6825d041b13600b868e000202f7d1a888c2412dc044620c0",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 248862,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama",
+            "Live"
+        ],
+        "version": 14,
+        "internalName": "AsianHome",
+        "description": "One home screen with your favourite rows from all your sources, search across them, and a source status check",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/AsianHome.cs3",
+        "name": "AsianHome"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Chartdrama.png",
+        "fileHash": "sha256-6dd7c31eef7caced4ff6303568cf3eba9f673844ddc2c5f04b6c987a0b21a551",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 226305,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "TvSeries",
+            "AsianDrama"
+        ],
+        "version": 4,
+        "internalName": "Chartdrama",
+        "description": "Short dramas from ReelShort, DramaBox, GoodShort, ShortMax and 40 more apps",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Chartdrama.cs3",
+        "name": "Chartdrama"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Cilixiong.png",
+        "fileHash": "sha256-f4669710976f34e26f48b1f94816e0b8fe1a16cd96674251275752ef2a05d4c5",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 219744,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 6,
+        "internalName": "Cilixiong",
+        "description": "\u78c1\u529b\u718a Cilixiong\uff1a\u8c46\u74e3\u9ad8\u5206\u7535\u5f71\u548c\u5267\u96c6\uff0c\u7535\u5f71\u53ef\u5728\u7ebf\u64ad\u653e\uff0c\u5e76\u9644\u78c1\u529b\u94fe\u63a5\uff08\u5267\u96c6\u4ec5\u7b2c\u4e00\u96c6\u5728\u7ebf\u9884\u89c8\uff0c\u5176\u4f59\u7528\u78c1\u529b\u4e0b\u8f7d\u64ad\u653e\uff09 / Highly rated movies and series: movies stream online, plus magnet links (series stream episode 1 only; whole seasons as magnets)",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Cilixiong.cs3",
+        "name": "Cilixiong"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Cinejoy.png",
+        "fileHash": "sha256-945d41bca3b68a8d84118727739e195bab3067345d19e6776722781aed048c39",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 229067,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 5,
+        "internalName": "Cinejoy",
+        "description": "Cinejoy (cinejoy.pk): English movies and TV series from the TMDB catalogue, streamed in up to 4K HDR, with curated lists and subtitles in dozens of languages",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Cinejoy.cs3",
+        "name": "Cinejoy"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Crackle.png",
+        "fileHash": "sha256-8944c86038d117103972e5d9aeda4f4e2658eb214f5572fd4509953204da2e2c",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 223456,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 14,
+        "internalName": "Crackle",
+        "description": "Crackle (crackle.beauty): movies and TV series from the TMDB catalogue, streamed via VixSrc",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Crackle.cs3",
+        "name": "Crackle"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Csxyy.png",
+        "fileHash": "sha256-c20bab03c9d9cc8257b7e18f4a8825f883cd213490703343f43c4836ca76f9e0",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 225258,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama"
+        ],
+        "version": 6,
+        "internalName": "Csxyy",
+        "description": "CN\u5f71\u9662 Csxyy\uff1a\u7535\u5f71\u3001\u7535\u89c6\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u548c\u77ed\u5267\uff0c\u81ea\u52a8\u53bb\u9664\u63d2\u64ad\u5e7f\u544a / Chinese movies, dramas, variety shows, anime and short dramas, with spliced-in ads removed",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Csxyy.cs3",
+        "name": "Csxyy"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Darkvod.png",
+        "fileHash": "sha256-8d884b6c15cbaf906900062d06f5a1451de8a039fe2484b3cc98f32a35446a2f",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 239680,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama"
+        ],
+        "version": 6,
+        "internalName": "Darkvod",
+        "description": "\u9ed1\u591c\u5f71\u9662 Darkvod\uff1a\u7535\u5f71\u3001\u8fde\u7eed\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u548c\u723d\u6587\u77ed\u5267\uff0c\u591a\u6761\u7ebf\u8def\uff0c\u81ea\u52a8\u53bb\u9664\u63d2\u64ad\u5e7f\u544a / Chinese movies, dramas, variety shows, anime and short dramas from several servers, with spliced-in ads removed",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Darkvod.cs3",
+        "name": "Darkvod"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Ddys.png",
+        "fileHash": "sha256-fc4b0bdf8b3385c35d2ceec1fe481212f03fac9775254447d4e0528000fefe67",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 214695,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime"
+        ],
+        "version": 13,
+        "internalName": "Ddys",
+        "description": "\u4f4e\u7aef\u5f71\u89c6 ddys\uff1a\u7535\u5f71\u3001\u5267\u96c6\u3001\u7efc\u827a\u548c\u52a8\u6f2b\uff08\u9700\u901a\u8fc7 Cloudflare \u9a8c\u8bc1\uff09",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Ddys.cs3",
+        "name": "Ddys"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Dm233.png",
+        "fileHash": "sha256-4b4018c7a7d9956ba627dc6c9128f68f9d82ea1c80e16f5e20940d68bc84c7ac",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 237790,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Anime",
+            "AnimeMovie"
+        ],
+        "version": 5,
+        "internalName": "Dm233",
+        "description": "233\u52a8\u6f2b Dm233\uff1a\u65e5\u6f2b\u3001\u56fd\u6f2b\u3001\u5267\u573a\u7248\u3001\u7f8e\u6f2b\u548c\u7279\u6444\uff0c\u4e2d\u6587\u5b57\u5e55\uff0c\u7cbe\u54c1\u7ebf\u8def 1080P \u76f4\u8fde / Japanese, Chinese and American anime, anime movies and tokusatsu with Chinese subtitles, including the site's own 1080p server",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Dm233.cs3",
+        "name": "Dm233"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Donghuastream.png",
+        "fileHash": "sha256-f1d607c665c5eee8164ae523328dcff28e943acbc906053a79038e7c639b6792",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 218237,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Anime",
+            "AnimeMovie"
+        ],
+        "version": 7,
+        "internalName": "Donghuastream",
+        "description": "Donghuastream: Chinese donghua (anime) series and movies with English and multi-language subtitles, up to 4K",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Donghuastream.cs3",
+        "name": "Donghuastream"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Dramafren.png",
+        "fileHash": "sha256-8cd4307f81ec0fb5323d86552cef1abe271314c84dfe1cfeb6fd8622c651b973",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 252477,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "AsianDrama",
+            "TvSeries"
+        ],
+        "version": 4,
+        "internalName": "Dramafren",
+        "description": "Chinese short dramas with English subtitles, plus DramaBox in English",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Dramafren.cs3",
+        "name": "Dramafren"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Dramanice.png",
+        "fileHash": "sha256-a421952ca4288234510f4b4a29f4c4edebcc4da01f8f08f709cdc7d38c4c18fd",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 239514,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "AsianDrama",
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 1,
+        "internalName": "Dramanice",
+        "description": "Dramanice (dramanice.cyou): Korean, Chinese, Japanese, Thai, Filipino and Taiwanese dramas, movies and K-shows with English subtitles",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Dramanice.cs3",
+        "name": "Dramanice"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Dramatip.png",
+        "fileHash": "sha256-cfd6e88dedf9a06a531ac06e6d82d022c57578bd7ff11bba7d2ca7c3f7c5a9e1",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 229672,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "TvSeries",
+            "AsianDrama"
+        ],
+        "version": 4,
+        "internalName": "Dramatip",
+        "description": "Short dramas from 90+ apps: YourChannel, ShortWave, MyDramaWave, ReelShort and more",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Dramatip.cs3",
+        "name": "Dramatip"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Duboku.png",
+        "fileHash": "sha256-ec7a9c91800dbed8047bf7aff6c640fe9e8da0801fdad2344e4a41a0be43a0c4",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 229252,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime"
+        ],
+        "version": 13,
+        "internalName": "Duboku",
+        "description": "\u72ec\u64ad\u5e93 Duboku\uff1a\u7535\u5f71\u3001\u8fde\u7eed\u5267\uff08\u9646\u5267\u3001\u65e5\u97e9\u5267\u3001\u53f0\u6cf0\u5267\uff09\u3001\u77ed\u5267\u3001\u7efc\u827a\u548c\u52a8\u6f2b",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Duboku.cs3",
+        "name": "Duboku"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Flixvision.png",
+        "fileHash": "sha256-960ce0ffdc0eacec0ee8d70b66c920d0f5c52c751861b1cc5403b4d9abaf3381",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 244090,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 14,
+        "internalName": "Flixvision",
+        "description": "FlixVision (flixvision.st): free movies and TV shows in English",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Flixvision.cs3",
+        "name": "Flixvision"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/FourKHDHub.png",
+        "fileHash": "sha256-eeb35660cc05580037bdb445e0ed572cdb88cb5d4e3038abaa5ed795c3910851",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 226147,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "AsianDrama",
+            "Anime"
+        ],
+        "version": 7,
+        "internalName": "FourKHDHub",
+        "description": "4KHDHub (4khdhub.one): Hollywood, Bollywood, Korean and anime movies and series with Hindi/English audio. Plays the site's HubCloud files directly; normal 1080p/720p files are listed first, 4K/Dolby Vision/remux last",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/FourKHDHub.cs3",
+        "name": "FourKHDHub"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Framextv.png?v=2",
+        "fileHash": "sha256-07c1a148dba4650a0ecb506c4e25e41d2868f41d7758740156e4e44a52af592f",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 223256,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 13,
+        "internalName": "Framextv",
+        "description": "frameXTV (framextv.cc): movies and TV series from the TMDB catalogue, streamed from the site's own multi-server backend",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Framextv.cs3",
+        "name": "Framextv"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Gqc.png",
+        "fileHash": "sha256-0413b6efffc4a3c98be9b7e2e978401d6c569606beb025085c1f136f08d1dc31",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 224978,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama",
+            "Documentary"
+        ],
+        "version": 6,
+        "internalName": "Gqc",
+        "description": "\u5171\u9752\u6625\u5f71\u9662 Gqc\uff08Cloudflare \u9a8c\u8bc1\uff09\uff1a\u7535\u5f71\u3001\u8fde\u7eed\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u3001\u77ed\u5267\u3001\u7eaa\u5f55\u7247\u548c\u97f3\u4e50\uff0c1080P \u7ebf\u8def\u4f18\u5148\uff0c\u81ea\u52a8\u53bb\u9664\u63d2\u64ad\u5e7f\u544a / Chinese movies, dramas, variety, anime, short dramas, documentaries and concerts; 1080p lines first, spliced-in ads removed",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Gqc.cs3",
+        "name": "Gqc"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Haotv.png",
+        "fileHash": "sha256-852a207242f120eb4279c29bb0a3599865d440fe6796f67ab10db0a622624f01",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 231350,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama",
+            "Documentary"
+        ],
+        "version": 9,
+        "internalName": "Haotv",
+        "description": "\u534e\u89c6\u754c Haotv (huashijie.tv)\uff1a\u7535\u5f71\u3001\u8fde\u7eed\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u3001\u77ed\u5267\u548c\u7eaa\u5f55\u7247\uff0c\u534e\u89c6\u754cVIP\u7ebf\u8def\u65e0\u5e7f\u544a / Chinese movies, dramas, variety shows, anime, short dramas and documentaries, with ad-free VIP streams",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Haotv.cs3",
+        "name": "Haotv"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Huarw.png",
+        "fileHash": "sha256-6a3ba1c35458ed39584a0b920c3db54029217a0aed1cb054cf390a896d7da790",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 223062,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama",
+            "Documentary"
+        ],
+        "version": 9,
+        "internalName": "Huarw",
+        "description": "\u534e\u4eba\u5f71\u9662 Huarw\uff1a\u7535\u5f71\u3001\u7535\u89c6\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u548c\u77ed\u5267 / Chinese movies, dramas, variety shows, anime and short dramas",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Huarw.cs3",
+        "name": "Huarw"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Huavod.png",
+        "fileHash": "sha256-b0414bc96da545448d4ccdd89b609994b0d912fe2a7b2c0e6409a91a21c79682",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 226446,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "Documentary"
+        ],
+        "version": 13,
+        "internalName": "Huavod",
+        "description": "\u534e\u89c6\u5f71\u9662 Huavod\uff1a\u7535\u5f71\u3001\u7535\u89c6\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u3001\u77ed\u5267\u548c\u7eaa\u5f55\u7247",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Huavod.cs3",
+        "name": "Huavod"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Kankanya.png",
+        "fileHash": "sha256-0d8218cac4d176b3be95a8756cd958c96afd29191bfce8cb71da9d112b67e084",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 236012,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AnimeMovie"
+        ],
+        "version": 6,
+        "internalName": "Kankanya",
+        "description": "\u770b\u770b\u9e2d Kankanya\uff1a\u7535\u5f71\u3001\u5267\u96c6\u3001\u52a8\u6f2b\u548c\u7efc\u827a\uff0c\u591a\u6761\u64ad\u653e\u7ebf\u8def / Chinese and international movies, dramas, anime and variety shows, with several servers per title",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Kankanya.cs3",
+        "name": "Kankanya"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Kissasian.png",
+        "fileHash": "sha256-118e4056e71522908a66107b00c9b8ab3de3c940551f0e373c3b26cb7050bedd",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 225570,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "AsianDrama",
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 13,
+        "internalName": "Kissasian",
+        "description": "Kissasian (kissasian.ng): Korean, Chinese, Japanese and Thai dramas and movies with English subtitles",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Kissasian.cs3",
+        "name": "Kissasian"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Kisskh.png",
+        "fileHash": "sha256-a5b9a6de7141258802db0cca56ccdfc0dd05a0707f8288354ca7203369afb3bf",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 216510,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "AsianDrama",
+            "TvSeries",
+            "Movie",
+            "Anime"
+        ],
+        "version": 7,
+        "internalName": "Kisskh",
+        "description": "Kisskh (kisskh.co): Korean, Chinese, Thai and Japanese dramas, Asian movies and anime with English and other subtitles",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Kisskh.cs3",
+        "name": "Kisskh"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Kkys.png",
+        "fileHash": "sha256-13b778f42def6c5883cf216611df077e9b901b4e96a52ce1e244991d349f5e01",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 238807,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama"
+        ],
+        "version": 6,
+        "internalName": "Kkys",
+        "description": "\u53ef\u53ef\u5f71\u89c6 Kkys\uff1a\u7535\u5f71\u3001\u8fde\u7eed\u5267\u3001\u52a8\u6f2b\u3001\u7efc\u827a\u7eaa\u5f55\u548c\u77ed\u5267\uff0c\u81ea\u6709 1080P \u8d85\u6e05\u7ebf\u8def\u4f18\u5148\uff0c\u81ea\u52a8\u53bb\u9664\u63d2\u64ad\u5e7f\u544a / Movies, dramas, anime, variety shows and short dramas from kkys14.com, with the site's own 1080p server first and spliced-in ads removed",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Kkys.cs3",
+        "name": "Kkys"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Kpkuang.png",
+        "fileHash": "sha256-a31fc942771eaea32c4c42a4a826175ea044fa50d4dd6c50f43b69865ed85644",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 240647,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama"
+        ],
+        "version": 6,
+        "internalName": "Kpkuang",
+        "description": "\u770b\u7247\u72c2\u4eba Kpkuang\uff1a\u7535\u5f71\u3001\u7535\u89c6\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u548c\u77ed\u5267\uff0c\u591a\u6761\u7ebf\u8def\uff0c\u81ea\u52a8\u53bb\u9664\u63d2\u64ad\u5e7f\u544a / Movies, TV dramas, variety shows, anime and short dramas from many servers, with spliced-in ads removed",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Kpkuang.cs3",
+        "name": "Kpkuang"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Kubb.png",
+        "fileHash": "sha256-cdb69f6f3112709237747b86f4d45ed998998ae0f3699c1df57d4e3e945cc485",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 237072,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "Documentary"
+        ],
+        "version": 15,
+        "internalName": "Kubb",
+        "description": "\u9177\u64ad Kubb\uff1a\u7535\u5f71\u3001\u7535\u89c6\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u3001\u7eaa\u5f55\u7247\u548c\u77ed\u5267",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Kubb.cs3",
+        "name": "Kubb"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Len.png",
+        "fileHash": "sha256-10f671fd9d9c49e44afe225efc0741046992c2e97061c13953c5c5ed58505d84",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 232663,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AnimeMovie"
+        ],
+        "version": 14,
+        "internalName": "Len",
+        "description": "\u51b7\u6620 Len\uff1a\u7535\u5f71\u3001\u7535\u89c6\u5267\u3001\u56fd\u4ea7\u5267\u3001\u6b27\u7f8e\u5267\u3001\u97e9\u5267\u3001\u65e5\u5267\u3001\u6e2f\u53f0\u5267\u3001\u6cf0\u5267\u548c\u52a8\u6f2b",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Len.cs3",
+        "name": "Len"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/LiveTv.png",
+        "fileHash": "sha256-5ca63231b52e1924a1b590135d173e0f34a174f14272685151784c5fe2d6ad94",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 226126,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Live"
+        ],
+        "version": 11,
+        "internalName": "LiveTv",
+        "description": "Free, publicly available live TV channels from the iptv-org project",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/LiveTv.cs3",
+        "name": "LiveTv"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Movies321.png",
+        "fileHash": "sha256-557b80f5c2001084b4e20c1e79a2e131dd2f3dc74d383cf06b87f0c3f784a157",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 241899,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "AsianDrama",
+            "Anime"
+        ],
+        "version": 5,
+        "internalName": "Movies321",
+        "description": "321Movies (321movies.xyz): movies, TV series, K-dramas and anime from the TMDB catalogue, streamed from the site's vidsrc.sh player with 40+ subtitle languages. Plays in CloudStream; in SkyStream it only plays when the site's own servers are up",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Movies321.cs3",
+        "name": "Movies321"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Movy.png",
+        "fileHash": "sha256-45746ea319ee8e10059939881ace9a56c24bd0d4c4740599b9848d1d0f540e5c",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 225030,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 11,
+        "internalName": "Movy",
+        "description": "Movy (movy.sx): movies and TV series from the TMDB catalogue, streamed from the site's own multi-server backend",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Movy.cs3",
+        "name": "Movy"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Mujizy.png",
+        "fileHash": "sha256-9791cc656b1fb6c61909b1ff19f5054a64ab7b5448c19f64819e7a3c9463b8d7",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 219165,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama"
+        ],
+        "version": 6,
+        "internalName": "Mujizy",
+        "description": "\u6bcd\u9e21\u8d44\u6e90 Mujizy\uff1a\u76f4\u8fde\u6bcd\u9e21\u8d44\u6e90\u7ad9\uff08mjzy 4K60\u5e27\u7ebf\u8def\uff09\uff0c\u7535\u5f71\u3001\u7535\u89c6\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u548c\u77ed\u5267\uff0c1080P \u65e0\u5e7f\u544a / Direct feed from the Mujizy (\u6bcd\u9e21\u8d44\u6e90) collection network: Chinese movies, dramas, variety shows, anime and short dramas in clean, ad-free 1080p",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Mujizy.cs3",
+        "name": "Mujizy"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Mvffm.png",
+        "fileHash": "sha256-a7098c5982a62d273495f60236e9df60eb1f6bbca656d9907cb4ea1db6e43c90",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 222373,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "Documentary"
+        ],
+        "version": 13,
+        "internalName": "Mvffm",
+        "description": "Movieffm \u96fb\u5f71\u7dda\u4e0a\u770b\uff1a\u96fb\u5f71\u3001\u9023\u7e8c\u5287\u3001\u7d9c\u85dd\u3001\u52d5\u6f2b\u548c\u7d00\u9304\u7247",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Mvffm.cs3",
+        "name": "Mvffm"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Nangua.png",
+        "fileHash": "sha256-0653426084272e78d30ca43cc661c2246a6218a5fac25ca07e0abe8f20b7f9a2",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 222217,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama",
+            "Documentary"
+        ],
+        "version": 6,
+        "internalName": "Nangua",
+        "description": "\u5357\u74dc\u5f71\u89c6 Nangua\uff1a\u7535\u5f71\u3001\u7535\u89c6\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u3001\u77ed\u5267\u548c\u7eaa\u5f55\u7247\uff0c\u591a\u6761\u7ebf\u8def\uff0c\u63d2\u64ad\u5e7f\u544a\u81ea\u52a8\u53bb\u9664 / Chinese movies, dramas, variety shows, anime, short dramas and documentaries, with several servers and spliced-in ads removed",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Nangua.cs3",
+        "name": "Nangua"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Nbyy.png",
+        "fileHash": "sha256-c372f2e845df8dbf747146321ccb7a1613c44a554aac09d420da8259552bda2d",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 222314,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama"
+        ],
+        "version": 9,
+        "internalName": "Nbyy",
+        "description": "\u6ce5\u5df4\u5f71\u9662 Nbyy\uff1a\u7535\u5f71\u3001\u7535\u89c6\u5267\u3001\u7efc\u827a\u548c\u52a8\u6f2b\uff0c\u591a\u6761\u7ebf\u8def / Chinese movies, dramas, variety shows and anime with multiple servers",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Nbyy.cs3",
+        "name": "Nbyy"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Ncat.png",
+        "fileHash": "sha256-433db6928ded2cb58b49150bd9b6decbb37aa4421dc221306338d1f672938c2d",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 236856,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama"
+        ],
+        "version": 6,
+        "internalName": "Ncat",
+        "description": "\u7f51\u98de\u732b Ncat\uff1a\u7535\u5f71\u3001\u8fde\u7eed\u5267\u3001\u52a8\u6f2b\u3001\u7efc\u827a\u7eaa\u5f55\u548c\u77ed\u5267\uff0c\u81ea\u6709 1080P \u8d85\u6e05\u7ebf\u8def\u4f18\u5148\uff0c\u81ea\u52a8\u53bb\u9664\u63d2\u64ad\u5e7f\u544a / Movies, dramas, anime, variety shows and short dramas from ncat30.com, with the site's own 1080p server first and spliced-in ads removed",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Ncat.cs3",
+        "name": "Ncat"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Netflixgc.png",
+        "fileHash": "sha256-7a5570803fc3c45dff9ba429e5359e07024d837abfba372a2e51d36bde9ad046",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 236375,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "Documentary"
+        ],
+        "version": 6,
+        "internalName": "Netflixgc",
+        "description": "\u5948\u98de\u5de5\u5382 Netflixgc\uff1aNetflix \u53ca\u6d77\u5916\u7535\u5f71\u3001\u5267\u96c6\u3001\u6f2b\u5267\u3001\u7efc\u827a\u548c\u7eaa\u5f55\u7247\uff0c\u81ea\u5e26\u84dd\u5149\u7ebf\u8def\uff0c\u63d2\u64ad\u5e7f\u544a\u81ea\u52a8\u53bb\u9664 / Netflix and international movies, series, anime, variety shows and documentaries, with the site's own Blu-ray server and spliced-in ads removed",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Netflixgc.cs3",
+        "name": "Netflixgc"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Olevod.png",
+        "fileHash": "sha256-0684e3795ca53a8d26fbc2068a789d7e9c03c2953120bf083538803254af48e3",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 223254,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime"
+        ],
+        "version": 16,
+        "internalName": "Olevod",
+        "description": "\u6b27\u4e50\u5f71\u9662\uff1a\u7535\u5f71\u3001\u8fde\u7eed\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u548c\u77ed\u5267\uff08\u516c\u5f00\u975e VIP \u64ad\u653e\uff09",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Olevod.cs3",
+        "name": "Olevod"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/OneTouchTV.png",
+        "fileHash": "sha256-d6915fcc1920a2d67c171d7011b547bd29ec0d51792d3fe7d57c69d438936836",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 218696,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "AsianDrama",
+            "TvSeries",
+            "Movie"
+        ],
+        "version": 7,
+        "internalName": "OneTouchTV",
+        "description": "OneTouchTV (onetouchtv.xyz): Korean, Chinese, Thai, Japanese, Taiwanese and Filipino dramas and movies with English and 20+ other subtitles",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/OneTouchTV.cs3",
+        "name": "OneTouchTV"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Qwfilm.png",
+        "fileHash": "sha256-d57928fe2aa1bf505c647f404a5f2502c0bb476ce4ae2a06cdda16b42bad7284",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 223225,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama"
+        ],
+        "version": 6,
+        "internalName": "Qwfilm",
+        "description": "\u4e03\u5473\u7f51 Qwfilm\uff08\u8bd5\u7528\u7248\uff0cCloudflare \u9a8c\u8bc1\uff09\uff1a\u7535\u5f71\u3001\u5267\u96c6\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u548c\u77ed\u5267 / Trial: Chinese movies, dramas, variety, anime and short dramas",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Qwfilm.cs3",
+        "name": "Qwfilm"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Reelfren.png",
+        "fileHash": "sha256-dad0d73c625004bad4ea0a84eff6db19f6736e7b77ed7e64a2297cc73a96a4ea",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 241193,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "TvSeries",
+            "AsianDrama"
+        ],
+        "version": 4,
+        "internalName": "Reelfren",
+        "description": "Short dramas from ReelShort, DramaBox, ShortMax and more apps, in one place",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Reelfren.cs3",
+        "name": "Reelfren"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Rivestream.png",
+        "fileHash": "sha256-a0d7d534cd69fbe5b50e1df133803665f016eccaf234abd2ffaa50614582db67",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 236403,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime"
+        ],
+        "version": 11,
+        "internalName": "Rivestream",
+        "description": "Rivestream (rivestream.app): movies, TV series, K-dramas and anime from the TMDB catalogue, streamed from the site's own multi-server backend",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Rivestream.cs3",
+        "name": "Rivestream"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Rivo.png",
+        "fileHash": "sha256-449036e8ef8c9b2783a0fe87a86c40ef2d2d2a2e04070f90e4e489c56e9e148c",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 217529,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 11,
+        "internalName": "Rivo",
+        "description": "Rivo (rivo.st): movies and TV series from the TMDB catalogue, streamed from the site's own HLS servers with subtitles",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Rivo.cs3",
+        "name": "Rivo"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Suikan.png",
+        "fileHash": "sha256-dc4467b2dee0cf29e5744bd78e737f91e69879032768074da3f19a0d550cd1c6",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 224778,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama"
+        ],
+        "version": 9,
+        "internalName": "Suikan",
+        "description": "\u968f\u4fbf\u770b\u5f71\u9662 Suikan\uff1a\u7535\u5f71\u3001\u7535\u89c6\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u548c\u77ed\u5267 / Chinese movies, dramas, variety shows, anime and short dramas",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Suikan.cs3",
+        "name": "Suikan"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Trjvod.png",
+        "fileHash": "sha256-cb316240c8e9ebc8c7ff0b1f50b407f2466e301923e6ed7e9910f082ae1bea4f",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 228330,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama"
+        ],
+        "version": 6,
+        "internalName": "Trjvod",
+        "description": "\u5510\u4eba\u8857\u5f71\u9662 Trjvod\uff1a\u7535\u5f71\u3001\u8fde\u7eed\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u3001\u77ed\u5267\u548c\u4f53\u80b2\uff0c\u591a\u6761\u7ebf\u8def / Chinese movies, dramas, variety shows, anime, short dramas and sports with multiple servers",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Trjvod.cs3",
+        "name": "Trjvod"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Uvod.png",
+        "fileHash": "sha256-20948d2d8c37cc89b9c32fbfe78c4de130c299a0e0c4bea673d856176cea7246",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 236948,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama",
+            "Documentary"
+        ],
+        "version": 4,
+        "internalName": "Uvod",
+        "description": "\u4f18\u89c6\u9891 UVOD\uff1a\u7535\u5f71\u3001\u7535\u89c6\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u3001\u7eaa\u5f55\u7247\u3001\u7ca4\u8bed\u548c\u513f\u7ae5\u8282\u76ee\uff08\u514d\u8d39\u6807\u6e05\uff09 / Chinese movies, dramas, variety shows, anime, documentaries, Cantonese and kids' titles (free SD tier)",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Uvod.cs3",
+        "name": "Uvod"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Xiaobao.png",
+        "fileHash": "sha256-2bcbcf90829dad533735e76cb581278bd3202cd0f80d0baaab9a4bc773913672",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 225426,
+        "status": 1,
+        "language": "zh",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime",
+            "AsianDrama",
+            "Documentary"
+        ],
+        "version": 13,
+        "internalName": "Xiaobao",
+        "description": "\u5c0f\u5b9d\u5f71\u9662 Xiaobao\uff1a\u7535\u5f71\u3001\u7535\u89c6\u5267\u3001\u7efc\u827a\u3001\u52a8\u6f2b\u3001\u77ed\u5267\u548c\u7eaa\u5f55\u7247",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Xiaobao.cs3",
+        "name": "Xiaobao"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Zxcstream.png",
+        "fileHash": "sha256-d29d2c0c7f3c9505f1480d0af4a8121cab9de971201764485c689a2dcbdbf5ea",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Latrixz/cloudstream-asian",
+        "fileSize": 268360,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "cloudstream-asian"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "AsianDrama",
+            "Anime"
+        ],
+        "version": 4,
+        "internalName": "Zxcstream",
+        "description": "ZXCStream (zxcstream.com): movies, TV series, K-dramas and anime from the TMDB catalogue. Plays from several servers without a WebView: 1080p multi-audio HLS, 4K on many movies, and dubbed audio (Hindi, Tagalog, Indonesian, Tamil, Telugu and more), with subtitles",
+        "url": "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/Zxcstream.cs3",
+        "name": "Zxcstream"
+    }
+]
