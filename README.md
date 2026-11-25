@@ -4,7 +4,13 @@ A [CloudStream](https://github.com/recloudstream/cloudstream) extension reposito
 
 ## Install
 
-In CloudStream: **Settings → Extensions → Add repository**, then enter:
+In CloudStream: **Settings → Extensions → Add repository**, then enter the short code:
+
+```
+csasian
+```
+
+Or the full link:
 
 ```
 https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/repo.json
