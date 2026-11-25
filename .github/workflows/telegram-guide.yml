@@ -1,0 +1,18 @@
+name: Post pinned guide on Telegram
+# Posts the installation guide from the live plugins.json and pins it. Run once (or again to
+# replace it); then save the printed message id as the repo variable TELEGRAM_GUIDE_MESSAGE_ID
+# so each build can keep the pinned guide up to date.
+on: workflow_dispatch
+permissions: {}
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Post and pin the guide
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT: "@csasian"
+        run: |
+          curl -s -o plugins.json https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/plugins.json
+          python3 scripts/telegram-guide.py post plugins.json

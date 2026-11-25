@@ -69,3 +69,12 @@ jobs:
           TELEGRAM_CHAT: "@csasian"
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: python3 $GITHUB_WORKSPACE/src/scripts/telegram-notify.py $RUNNER_TEMP/old-plugins.json $GITHUB_WORKSPACE/builds/plugins.json
+
+      - name: Keep the pinned Telegram guide up to date
+        if: success()
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT: "@csasian"
+          TELEGRAM_GUIDE_MESSAGE_ID: ${{ vars.TELEGRAM_GUIDE_MESSAGE_ID }}
+        run: python3 $GITHUB_WORKSPACE/src/scripts/telegram-guide.py edit $GITHUB_WORKSPACE/builds/plugins.json
