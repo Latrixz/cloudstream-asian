@@ -1,3 +1,5 @@
+<img src="branding/logo-512.png" width="120" align="right" alt="CloudStream Asian logo">
+
 # CloudStream Asian
 
 [![Telegram](https://img.shields.io/badge/Telegram-Join%20csasian-26A5E4?logo=telegram&logoColor=white)](https://t.me/csasian)
