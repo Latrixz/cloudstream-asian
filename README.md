@@ -54,6 +54,7 @@ If these sources are useful to you, you can support their upkeep:
 | Flixvision | flixvision.st | English |
 | Framextv (frameXTV) | framextv.cc | English |
 | LiveTv (直播 Live TV) | iptv-org.github.io | Live TV (free channels) |
+| AsianHome (CS Asian 首页) | — | Combined home screen and search across your sources |
 
 ## Branches
 
