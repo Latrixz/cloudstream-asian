@@ -10,7 +10,7 @@ import java.security.MessageDigest
 
 class OlevodProvider : MainAPI() {
     override var mainUrl = "https://www.olevod.com"
-    override var name = "欧乐影院"
+    override var name = "欧乐影院 Olevod"
     override var lang = "zh"
     override val hasMainPage = true
     override val hasQuickSearch = true
@@ -92,6 +92,8 @@ class OlevodProvider : MainAPI() {
         if (freeEpisodes.isEmpty()) throw ErrorLoadingException("此影片没有公开的非 VIP 播放源")
 
         val poster = poster(vod.picThumb.ifBlank { vod.pic })
+        // Wide banner (about 1680x580) used by the site's home slider; empty for many titles.
+        val background = poster(vod.picSlide)
         val year = vod.year.toIntOrNull()
         val tags = (listOf(vod.typeIdName, vod.area, vod.lang) + vod.className.split(',', '/', ' '))
             .map { it.trim() }
@@ -107,15 +109,19 @@ class OlevodProvider : MainAPI() {
             basePlot
         }
 
+        val recommended = recommendationsFor(vod)
+
         return if (vod.typeId1 == 1) {
             val first = freeEpisodes.first()
             newMovieLoadResponse(vod.name, url, TvType.Movie, playbackData(vod.id, first.index)) {
                 posterUrl = poster
+                backgroundPosterUrl = background
                 plot = plotText
                 this.year = year
                 this.tags = tags
                 this.score = score
                 this.actors = actors
+                this.recommendations = recommended
             }
         } else {
             val type = if (vod.typeId1 == 4) TvType.Anime else TvType.TvSeries
@@ -127,11 +133,13 @@ class OlevodProvider : MainAPI() {
             }
             newTvSeriesLoadResponse(vod.name, url, type, episodes) {
                 posterUrl = poster
+                backgroundPosterUrl = background
                 plot = plotText
                 this.year = year
                 this.tags = tags
                 this.score = score
                 this.actors = actors
+                this.recommendations = recommended
             }
         }
     }
@@ -160,6 +168,15 @@ class OlevodProvider : MainAPI() {
         )
         return true
     }
+
+    /** Same as the website's "猜你喜欢": random titles from the same category and sub-type. */
+    private suspend fun recommendationsFor(vod: VodDetail): List<SearchResponse> = runCatching {
+        app.get(signed("/v1/pub/vod/random/${vod.typeId1}/${vod.typeId}/16"))
+            .parsed<RandomResponse>()
+            .data.orEmpty()
+            .filter { !it.vip && it.id != vod.id }
+            .map { it.toSearchResponse() }
+    }.getOrDefault(emptyList())
 
     private fun signed(path: String): String {
         val separator = if ('?' in path) '&' else '?'
@@ -272,6 +289,12 @@ data class VodItem(
     val vip: Boolean = false,
 )
 
+data class RandomResponse(
+    val code: Int = -1,
+    val data: List<VodItem>? = null,
+    val msg: String = "",
+)
+
 data class VodDetailResponse(
     val code: Int = -1,
     val data: VodDetail? = null,
@@ -285,6 +308,7 @@ data class VodDetail(
     val typeId1: Int = 0,
     val pic: String = "",
     val picThumb: String = "",
+    val picSlide: String = "",
     val blurb: String = "",
     val content: String = "",
     val year: String = "",

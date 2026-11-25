@@ -43,11 +43,17 @@ async function checkTitle(categoryId) {
   const detail = await get(BASE + detailPath);
   const plays = [...new Set(detail.match(/\/vodplay\/\d+-\d+-\d+\.html/g) ?? [])];
   assert.ok(plays.length > 0, `${detailPath}: no episodes`);
+  // Recommendations: the sidebar "{分类}热播" list (the page has no 猜你喜欢 block), minus this title.
+  const sidebar = detail.split(' myui-sidebar">')[1] ?? "";
+  const related = [...new Set(sidebar.match(/\/voddetail\/\d+\.html/g) ?? [])].filter((p) => p !== detailPath).slice(0, 16);
+  assert.ok(related.length > 0, `${detailPath}: no recommendations`);
+  const relatedDetail = await get(BASE + related[0]);
+  assert.ok(relatedDetail.includes("myui-content__detail"), `${related[0]}: recommendation does not open a detail page`);
   const stream = decodePlayer(await get(BASE + plays[0]));
   const m3u8 = await fetch(stream, { headers: { "User-Agent": UA } });
   assert.equal(m3u8.ok, true, `${stream}: HTTP ${m3u8.status}`);
   assert.match(await m3u8.text(), /^#EXTM3U/m, "not an HLS playlist");
-  return { detailPath, episodeLinks: plays.length };
+  return { detailPath, episodeLinks: plays.length, recommendations: related.length };
 }
 
 console.log(JSON.stringify({ rows, series: await checkTitle(2), movie: await checkTitle(1) }, null, 2));

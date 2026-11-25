@@ -166,6 +166,15 @@ class XiaobaoProvider : MainAPI() {
             plot,
         ).joinToString("\n").ifBlank { null }
 
+        // 猜你喜欢 has two tabs on this page: 同类型 (ul#type) and 同主演 (ul#actor).
+        val current = url.substringBefore('#')
+        val recommended = document.select("ul#type, ul#actor")
+            .flatMap { listItems(it) }
+            .filter { it.url != current }
+            .distinctBy { it.url }
+            .take(16)
+            .map { it.toSearchResponse(type) }
+
         // Sources can differ in length; list the most complete one and match the others by number.
         val canonical = sources.maxByOrNull { it.entries.size }!!
         val episodes = canonical.entries.mapIndexed { position, entry ->
@@ -183,6 +192,7 @@ class XiaobaoProvider : MainAPI() {
                 this.year = year
                 this.tags = allTags
                 this.actors = actors
+                this.recommendations = recommended
             }
         } else {
             val list = episodes.mapIndexed { position, (entry, data) ->
@@ -197,6 +207,7 @@ class XiaobaoProvider : MainAPI() {
                 this.year = year
                 this.tags = allTags
                 this.actors = actors
+                this.recommendations = recommended
             }
         }
     }
@@ -387,8 +398,8 @@ class XiaobaoProvider : MainAPI() {
 
     private data class ListItem(val title: String, val url: String, val poster: String?)
 
-    private fun listItems(document: Document): List<ListItem> =
-        document.select(".myui-vodlist__box").mapNotNull { box ->
+    private fun listItems(root: Element): List<ListItem> =
+        root.select(".myui-vodlist__box").mapNotNull { box ->
             val link = box.selectFirst("a.myui-vodlist__thumb") ?: return@mapNotNull null
             val href = link.attr("href").takeIf { it.contains("/vod/detail/") } ?: return@mapNotNull null
             val title = link.attr("title").trim()

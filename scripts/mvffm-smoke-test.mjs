@@ -95,7 +95,19 @@ async function checkTitle(url) {
     } catch { /* unreachable source */ }
   }
   assert.ok(playable > 0, `${url}: no source returned a playable stream`);
-  return { url, sources: sources.length, playableSources: playable, episodes: Math.max(...sources.map((s) => s.length)) };
+  // Recommendations: the first (active) 猜你喜歡 tab of #single_relacionados_b, playable paths only.
+  const box = page.split('id="single_relacionados_b"')[1] ?? "";
+  const tab = box.split('<div class="relacion_tab')[1] ?? "";
+  const related = [...new Set([...tab.matchAll(/<article><a href="([^"]+)"/g)].map((m) => m[1]))]
+    .filter((u) => (u.includes("/movies/") || u.includes("/drama/")) && u !== url).slice(0, 16);
+  assert.ok(related.length > 0, `${url}: no recommendations`);
+  assert.ok(parseSources(await html(related[0])).length > 0, `${related[0]}: recommendation has no sources`);
+  const extras = {
+    castPhotos: (page.split('<div id="cast"')[1]?.split("srelacionados")[0].match(/data-lazy-src="https:\/\/image\.tmdb\.org\/t\/p\/w92\/[^"]+"/g) ?? []).length,
+    duration: page.match(/class='runtime'>片長：<b>(\d+)/)?.[1] ?? null,
+    background: /id='dt_galery'[\s\S]*?<a href='https?:/.test(page),
+  };
+  return { url, sources: sources.length, playableSources: playable, episodes: Math.max(...sources.map((s) => s.length)), recommendations: related.length, ...extras };
 }
 
 const movieUrl = (await html(`${BASE}/movies/?orderby=date`)).match(/href="(https:\/\/www\.mvffm\.net\/movies\/(?!page\/)[^"]+\/)"/)[1];

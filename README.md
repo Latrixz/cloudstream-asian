@@ -52,6 +52,7 @@ If these sources are useful to you, you can support their upkeep:
 | Kissasian | kissasian.ng | English (Asian dramas) |
 | Crackle | crackle.beauty | English |
 | Flixvision | flixvision.st | English |
+| Framextv (frameXTV) | framextv.cc | English |
 
 ## Branches
 

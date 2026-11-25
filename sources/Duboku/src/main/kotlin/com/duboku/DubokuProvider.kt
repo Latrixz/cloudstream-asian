@@ -217,6 +217,7 @@ class DubokuProvider : MainAPI() {
         val allTags = (tags + genres).map { it.trim() }.filter { it.isNotBlank() }.distinct()
         val actors = actorNames.filter { it.isNotBlank() }.distinct().take(15).map { ActorData(Actor(it)) }
         val plotText = listOfNotNull(updated?.let { "（更新：$it）" }, plot).joinToString("\n").ifBlank { null }
+        val recommended = sidebarItems(document, url).map { it.toSearchResponse(type) }
 
         return if (type == TvType.Movie) {
             val entry = sources.first { it.entries.isNotEmpty() }.entries.first()
@@ -227,6 +228,7 @@ class DubokuProvider : MainAPI() {
                 this.tags = allTags
                 this.score = score?.let { Score.from10(it) }
                 this.actors = actors
+                this.recommendations = recommended
             }
         } else {
             // Sources can differ in length; list the most complete one and match the rest by number.
@@ -244,6 +246,7 @@ class DubokuProvider : MainAPI() {
                 this.tags = allTags
                 this.score = score?.let { Score.from10(it) }
                 this.actors = actors
+                this.recommendations = recommended
             }
         }
     }
@@ -442,6 +445,23 @@ class DubokuProvider : MainAPI() {
             if (title.isBlank()) return@mapNotNull null
             ListItem(title, fixUrl(href), imageOf(link), box.selectFirst(".pic-text")?.text()?.trim())
         }.distinctBy { it.url }
+
+    /**
+     * The detail page has no 猜你喜欢 block; its only related list is the sidebar's
+     * "{分类}热播" ranking (same category). The first entry has a poster, the rest are text links.
+     */
+    private fun sidebarItems(document: Document, currentUrl: String): List<ListItem> {
+        val sidebar = document.selectFirst(".myui-sidebar") ?: return emptyList()
+        val posters = sidebar.select("a.myui-vodlist__thumb[href*=/voddetail/]")
+            .associate { fixUrl(it.attr("href")) to imageOf(it) }
+        val current = currentUrl.substringBefore('#')
+        return sidebar.select("a[href*=/voddetail/]").mapNotNull { link ->
+            val href = fixUrl(link.attr("href"))
+            if (href == current) return@mapNotNull null
+            val title = link.attr("title").trim().ifBlank { link.text().trim() }
+            if (title.isBlank()) null else ListItem(title, href, posters[href])
+        }.distinctBy { it.url }.take(16)
+    }
 
     private fun ListItem.toSearchResponse(type: TvType): SearchResponse =
         if (type == TvType.Movie) {

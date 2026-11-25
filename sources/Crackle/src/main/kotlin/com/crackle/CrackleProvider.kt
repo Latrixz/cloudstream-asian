@@ -106,8 +106,10 @@ class CrackleProvider : MainAPI() {
         val yearValue = (d.text("release_date") ?: d.text("first_air_date"))?.take(4)?.toIntOrNull()
         val scoreValue = d["vote_average"]?.asDouble()?.takeIf { it > 0 }?.let { Score.from10(it) }
         val tagList = d["genres"]?.mapNotNull { it.text("name") }.orEmpty()
-        val actorList = d["credits"]?.get("cast")?.take(20)?.mapNotNull { it.text("name") }.orEmpty()
-            .map { ActorData(Actor(it)) }
+        val actorList = d["credits"]?.get("cast")?.take(20)?.mapNotNull { c ->
+            val actorName = c.text("name") ?: return@mapNotNull null
+            ActorData(Actor(actorName, image(c.text("profile_path"), "w185")), roleString = c.text("character"))
+        }.orEmpty()
         val imdbId = d["external_ids"]?.text("imdb_id") ?: d.text("imdb_id")
         val trailer = d["videos"]?.get("results")
             ?.firstOrNull { it.text("site") == "YouTube" && it.text("type") == "Trailer" }

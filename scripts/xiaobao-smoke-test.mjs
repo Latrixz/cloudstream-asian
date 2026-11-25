@@ -157,8 +157,17 @@ async function links(sources, canonical, position) {
 }
 
 async function checkTitle(detailUrl, expectSeries) {
-  const d = parseDetail(await fetchText(detailUrl));
+  const page = await fetchText(detailUrl);
+  const d = parseDetail(page);
   assert.ok(d.title, `${detailUrl}: no title`);
+  // Recommendations: 猜你喜欢 tabs 同类型 (ul#type) and 同主演 (ul#actor), minus this title.
+  const related = ["type", "actor"]
+    .flatMap((id) => listItems((page.split(`<ul id="${id}"`)[1] ?? "").split("</ul>")[0]))
+    .filter((item, i, all) => item.url !== detailUrl && all.findIndex((o) => o.url === item.url) === i)
+    .slice(0, 16);
+  assert.ok(related.length > 0, `${d.title}: no recommendations`);
+  assert.ok(related.every((r) => r.poster), `${d.title}: recommendation without poster`);
+  assert.ok(parseDetail(await fetchText(related[0].url)).title, `${related[0].url}: recommendation does not open`);
   assert.ok(d.poster, `${d.title}: no poster`);
   assert.ok(d.plot.length > 10, `${d.title}: no plot`);
   assert.ok(d.year, `${d.title}: no year`);
@@ -176,7 +185,8 @@ async function checkTitle(detailUrl, expectSeries) {
   const seg = await fetch(best.hls.segment, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(20000) });
   assert.equal(seg.ok, true, `${d.title}: segment HTTP ${seg.status}`);
   console.log(`ok  ${expectSeries ? "series" : "movie"} "${d.title}" (${d.categoryName}/${d.categoryId}, ${d.year}), ${canonical.entries.length} episode(s), ` +
-    `sources [${d.sources.map((s) => `${s.label}:${s.entries.length}`).join(", ")}], cast ${(vod?.vod_actor || d.actors.join(",")).split(",").length}, genres "${vod?.vod_class}"`);
+    `sources [${d.sources.map((s) => `${s.label}:${s.entries.length}`).join(", ")}], cast ${(vod?.vod_actor || d.actors.join(",")).split(",").length}, genres "${vod?.vod_class}", ` +
+    `${related.length} recommendations`);
   for (const f of found) {
     console.log(`      ${f.alive ? "live" : "dead"} ${f.label} ${canonical.entries[position].name}: ${f.alive ? `${f.hls.minutes.toFixed(1)} min${f.hls.encrypted ? " (AES-128)" : ""}` : "unreachable"}  ${f.stream}`);
   }

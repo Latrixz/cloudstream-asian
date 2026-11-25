@@ -72,7 +72,39 @@ async function playable(key) {
   return { title: detail.title, episodes: free.length, quality: play.mediaTitle };
 }
 
+// KubbProvider.recommendations(): 相关视频 (rankv21 home/getRelativeVideo) then 猜你喜欢 (List/GuessYouLike).
+const RANK_API = "https://rankv21.kubb.tv/api";
+const fullImage = (url) => (url || "").replace(/(\/\d{15,})s(\.\w+)$/, "$1$2");
+async function recommendations(key) {
+  const detail = await get(`${VIDEO_API}/video/detail`, {
+    ispath: "false", cinema: "1", device: "1", player: "CkPlayer", tech: "HLS",
+    country: "HU", lang: "cns", region: "GL.", id: key,
+  });
+  const relatedResponse = await fetch(signed(`${RANK_API}/home/getRelativeVideo`, {
+    cinema: "1", cid: detail.cid, title: detail.title, size: "10", set: "1", id: String(detail.id),
+  }), { headers: { "User-Agent": UA, Origin: "https://www.kubb.tv", Referer: "https://www.kubb.tv/" } }).then((r) => r.json());
+  assert.equal(relatedResponse.data?.code, 0, `${detail.title}: related ${relatedResponse.data?.msg}`);
+  const related = (relatedResponse.data.info || []).filter((item) => item?.contxt && item.title)
+    .map((item) => ({ key: item.contxt, title: item.title, poster: fullImage(item.imgPath) }));
+  const guessResponse = await fetch(signed(`${LIST_API}/List/GuessYouLike`, { cinema: "1", CID: detail.cid, PageSize: "35" }),
+    { headers: { "User-Agent": UA, Origin: "https://www.kubb.tv", Referer: "https://www.kubb.tv/" } }).then((r) => r.json());
+  assert.equal(guessResponse.data?.code, 0, `${detail.title}: guess-you-like ${guessResponse.data?.msg}`);
+  const guess = (guessResponse.data.info || []).filter((item) => item?.key && item.title)
+    .map((item) => ({ key: item.key, title: item.title, poster: item.image }));
+  const items = [...new Map([...related, ...guess].filter((i) => i.key !== detail.key).map((i) => [i.key, i])).values()].slice(0, 16);
+  assert.ok(related.length > 0, `${detail.title}: no related videos`);
+  assert.ok(items.length > 0, `${detail.title}: no recommendations`);
+  const poster = await fetch(related[0].poster, { headers: { "User-Agent": UA } });
+  assert.equal(poster.ok, true, `${related[0].title}: poster HTTP ${poster.status}`);
+  return { title: detail.title, related: related.length, guess: guess.length, shown: items.length, first: items.slice(0, 3).map((i) => i.title) };
+}
+
 const movie = await playable((await search("", "0,1,3", "0")).result[0].key);
 const drama = await playable(drama1.result[0].key);
 
-console.log(JSON.stringify({ catalogueTotals: counts, searchHits: found.recordcount, movie, drama }, null, 2));
+const recommended = [
+  await recommendations((await search("", "0,1,3", "0")).result[0].key),
+  await recommendations(drama1.result[0].key),
+];
+
+console.log(JSON.stringify({ catalogueTotals: counts, searchHits: found.recordcount, movie, drama, recommended }, null, 2));

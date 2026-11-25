@@ -184,4 +184,32 @@ function fmt(results) {
   console.log(`popular series OK: ${s.title} ${canonical.length} episodes; ep ${canonical[0].number} streams: ${fmt(streams)}`);
 }
 
+// Recommendations: the detail page's server-rendered "猜你喜欢" grid (LenProvider.recommendations()).
+async function recommendations(kind, id) {
+  const response = await fetch(`${MAIN}/vod/${kind}-${id}`, { headers: HEADERS, redirect: "follow" });
+  assert.equal(response.ok, true, `${kind}-${id} page: HTTP ${response.status}`);
+  const html = await response.text();
+  const start = html.indexOf(">猜你喜欢</h3>");
+  assert.ok(start > 0, `${kind}-${id}: no 猜你喜欢 section`);
+  const section = html.slice(start, html.indexOf("</section>", start));
+  const items = [...section.matchAll(/<a class="group block" href="(\/vod\/(movie|tv)-(?:[^"]*-)?(\d+))">([\s\S]*?)<\/a>/g)]
+    .map(([, href, k, itemId, body]) => ({
+      url: `${MAIN}/vod/${k}-${itemId}`,
+      title: body.match(/alt="([^"]*)"/)?.[1]?.replace(/\u200b/g, "").trim(),
+      poster: decodeURIComponent(body.match(/[?&]url=([^&\s"]+)/)?.[1] ?? ""),
+    }))
+    .filter((item) => item.url !== `${MAIN}/vod/${kind}-${id}` && item.title)
+    .slice(0, 16);
+  assert.ok(items.length > 0, `${kind}-${id}: 猜你喜欢 is empty`);
+  assert.ok(items.every((item) => item.poster.startsWith("http")), `${kind}-${id}: recommendation without poster`);
+  // Every recommendation must open with load(): its detail API answers.
+  const first = items[0].url.match(/\/vod\/(movie|tv)-(\d+)/);
+  assert.ok((await detail(first[1], first[2])).title, `${items[0].url}: detail API failed`);
+  return items;
+}
+for (const [kind, id] of [["movie", movieId], ["tv", seriesId]]) {
+  const items = await recommendations(kind, id);
+  console.log(`recommendations OK: ${kind}-${id} → ${items.length} (${items.slice(0, 3).map((i) => i.title).join(", ")})`);
+}
+
 console.log("All Len smoke tests passed.");

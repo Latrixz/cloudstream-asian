@@ -2,10 +2,12 @@ package com.len
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import java.net.URLDecoder
 import java.net.URLEncoder
 
 class LenProvider : MainAPI() {
@@ -117,16 +119,22 @@ class LenProvider : MainAPI() {
             .mapNotNull { it?.trim() }
             .filter { it.isNotBlank() && it != "其它" }
             .distinct()
-        val actors = splitNames(detail.actors).take(20).map { ActorData(Actor(it)) }
+        val actors = splitNames(detail.actors).take(20).map { ActorData(Actor(it)) } +
+            splitNames(detail.director).take(3).map { ActorData(Actor(it), roleString = "导演") }
         val score = detail.rating?.toDoubleOrNull()?.takeIf { it > 0 }?.let { Score.from10(it) }
         val basePlot = cleanText(detail.description)
         val year = detail.year?.takeIf { it > 0 }
             ?: (detail.releaseDate ?: detail.firstAirDate)?.take(4)?.toIntOrNull()
         val poster = detail.poster?.takeIf { it.startsWith("http") }
         val canonicalUrl = "$mainUrl/vod/$kind-$id"
+        // These fields exist in the API but are usually null; only use them when filled.
+        val background = detail.backdrop?.trim()?.takeIf { it.startsWith("http") }
+        val trailer = detail.trailerUrl?.trim()?.takeIf { it.startsWith("http") }
+        val runtime = detail.duration?.let { Regex("""\d+""").find(it)?.value?.toIntOrNull() }?.takeIf { it > 0 }
 
         val sources = detail.sourceOptions.filter { it.episodes.isNotEmpty() }
         if (sources.isEmpty()) throw ErrorLoadingException("此影片暂无播放来源")
+        val recommended = recommendations(canonicalUrl)
 
         return if (isMovie) {
             if (sources.none { source -> source.episodes.any { it.isAvailable && it.videoUrl.isNotBlank() } }) {
@@ -139,6 +147,10 @@ class LenProvider : MainAPI() {
                 this.tags = tags
                 this.score = score
                 this.actors = actors
+                this.recommendations = recommended
+                backgroundPosterUrl = background
+                duration = runtime
+                trailer?.let { addTrailer(it) }
             }
         } else {
             // Sources sometimes lag behind each other; list episodes from the most complete one.
@@ -170,6 +182,10 @@ class LenProvider : MainAPI() {
                 this.tags = tags
                 this.score = score
                 this.actors = actors
+                this.recommendations = recommended
+                backgroundPosterUrl = background
+                duration = runtime
+                trailer?.let { addTrailer(it) }
                 showStatus = if (detail.isFinished == 1) ShowStatus.Completed else ShowStatus.Ongoing
             }
         }
@@ -229,6 +245,31 @@ class LenProvider : MainAPI() {
             )
         }
         return true
+    }
+
+    /** The detail page's server-rendered "猜你喜欢" grid; there is no JSON endpoint for it. */
+    private suspend fun recommendations(pageUrl: String): List<SearchResponse> = runCatching {
+        val document = app.get(pageUrl, headers = apiHeaders).document
+        val section = document.select("section").firstOrNull { it.selectFirst("h3")?.text()?.trim() == "猜你喜欢" }
+            ?: return@runCatching emptyList()
+        val self = parseVodUrl(pageUrl)
+        section.select("a[href*=/vod/]").mapNotNull { link ->
+            val (kind, id) = parseVodUrl(link.attr("href")) ?: return@mapNotNull null
+            if (kind to id == self) return@mapNotNull null
+            val img = link.selectFirst("img")
+            val title = img?.attr("alt")?.trim().orEmpty().ifBlank { link.text().trim() }
+                .replace("\u200b", "").trim().ifBlank { return@mapNotNull null }
+            val isMovie = kind == "movie"
+            searchResult(title, "$mainUrl/vod/$kind-$id", img?.let(::imageOf), if (isMovie) TvType.Movie else TvType.TvSeries)
+        }.distinctBy { it.url }.take(MAX_RECOMMENDATIONS)
+    }.getOrDefault(emptyList())
+
+    /** Next.js images point at /_next/image?url=<encoded original>; return the original URL. */
+    private fun imageOf(img: org.jsoup.nodes.Element): String? {
+        val raw = img.attr("srcset").ifBlank { img.attr("src") }
+        val encoded = Regex("""[?&]url=([^&\s]+)""").find(raw)?.groupValues?.get(1)
+        val url = encoded?.let { URLDecoder.decode(it, "UTF-8") } ?: raw.substringBefore(' ')
+        return url.takeIf { it.startsWith("http") }
     }
 
     private suspend fun fetchDetail(kind: String, id: String): VodDetail {
@@ -302,6 +343,7 @@ class LenProvider : MainAPI() {
         // The list API caps page at 1000, so 60 per page is needed to reach the end of the movie catalogue.
         private const val LIST_PAGE_SIZE = 60
         private const val SEARCH_PAGE_SIZE = 24
+        private const val MAX_RECOMMENDATIONS = 16
         private const val ANIMATION_MOVIE_CATEGORY = 8
     }
 }
@@ -364,6 +406,10 @@ data class VodDetail(
     val region: String? = null,
     val language: String? = null,
     val actors: String? = null,
+    val director: String? = null,
+    val backdrop: String? = null,
+    @JsonProperty("trailer_url") val trailerUrl: String? = null,
+    val duration: String? = null,
     val rating: String? = null,
     @JsonProperty("category_id") val categoryId: Int? = null,
     @JsonProperty("category_name") val categoryName: String? = null,

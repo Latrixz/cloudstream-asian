@@ -114,11 +114,39 @@ class MvffmProvider : MainAPI() {
                 (infoLines["地區"]?.select("a")?.map { it.text() } ?: emptyList()) +
                 listOfNotNull(header.selectFirst(".country b")?.text())
             ).map { it.trim() }.filter { it.isNotBlank() }.distinct()
-        val actorNames = (
-            document.select("#cast a[href*=/cast/]").map { it.text() } +
-                (infoLines["主演"]?.text()?.substringAfter('：')?.split('/', ',', '，', '、', ' ') ?: emptyList())
-            ).map { it.trim() }.filter { it.isNotBlank() }.distinct().take(15)
-        val actors = actorNames.map { ActorData(Actor(it)) }
+        // Movie pages have a TMDB-backed #cast tab (photo + character); series pages only list
+        // names under 主演.
+        val castCards = document.select("#cast .person").mapNotNull { person ->
+            val name = person.selectFirst(".name")?.text()?.trim().orEmpty()
+            val role = person.selectFirst(".caracter")?.text()?.trim().orEmpty()
+            if (name.isBlank() || role == "導演") return@mapNotNull null
+            val photo = imageOf(person.selectFirst(".img img"))
+                ?.takeUnless { it.trimEnd('/').endsWith("/w92") }
+                ?.replace("/t/p/w92/", "/t/p/w185/")
+            ActorData(Actor(name, photo), roleString = role.ifBlank { null })
+        }
+        val listedNames = (infoLines["主演"]?.select("a")?.map { it.text() }?.takeIf { it.isNotEmpty() }
+            ?: infoLines["主演"]?.text()?.substringAfter('：')?.split('/', ',', '，', '、', ' ').orEmpty())
+            .map { it.trim() }.filter { it.isNotBlank() }
+        val actors = (castCards + listedNames.map { ActorData(Actor(it)) })
+            .distinctBy { it.actor.name }
+            .take(15)
+        // "片長：<b>97 分鐘</b>" (movies only).
+        val duration = Regex("""(\d+)\s*分""").find(header.select(".runtime").text())
+            ?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it > 0 }
+        // 劇照 gallery: full-size TMDB stills.
+        val background = document.select("#dt_galery .g-item a[href]")
+            .map { it.attr("href").trim() }
+            .firstOrNull { it.startsWith("http") }
+        // 猜你喜歡 is the first (active) tab; the others are site-wide 日/周/月人氣 lists.
+        val current = url.substringBefore('#').trimEnd('/')
+        val relatedTab = document.selectFirst("#single_relacionados_b .relacion_tab.active")
+            ?: document.selectFirst("#single_relacionados_b .relacion_tab")
+        val recommended = relatedTab?.select("article")?.mapNotNull { it.toRelatedResult() }
+            ?.filter { it.url.trimEnd('/') != current }
+            ?.distinctBy { it.url }
+            ?.take(16)
+            .orEmpty()
         val status = infoLines["狀態"]?.selectFirst("span")?.text()?.trim()
         val plotText = listOfNotNull(status?.let { "（$it）" }, plot).joinToString("\n").ifBlank { null }
 
@@ -133,6 +161,9 @@ class MvffmProvider : MainAPI() {
                 this.tags = tags
                 this.score = rating?.let { Score.from10(it) }
                 this.actors = actors
+                this.duration = duration
+                this.backgroundPosterUrl = background
+                this.recommendations = recommended
             }
         } else {
             // Episode lists differ slightly between sources; use the most complete one.
@@ -150,6 +181,9 @@ class MvffmProvider : MainAPI() {
                 this.tags = tags
                 this.score = rating?.let { Score.from10(it) }
                 this.actors = actors
+                this.duration = duration
+                this.backgroundPosterUrl = background
+                this.recommendations = recommended
             }
         }
     }
@@ -335,6 +369,17 @@ class MvffmProvider : MainAPI() {
         val poster = imageOf(selectFirst(".poster img"))
         val typeText = selectFirst(".dramaleixing")?.text().orEmpty()
         return searchResult(title, href, poster, typeOf(href, typeText))
+    }
+
+    private fun Element.toRelatedResult(): SearchResponse? {
+        val link = selectFirst("a[href]") ?: return null
+        val href = fixUrl(link.attr("href"))
+        // Same rule as search: /tvshows/ hubs are not playable.
+        if (!href.contains("/movies/") && !href.contains("/drama/")) return null
+        val img = selectFirst("img")
+        val title = img?.attr("alt")?.trim().orEmpty().ifBlank { link.text().trim() }
+        if (title.isBlank()) return null
+        return searchResult(title, href, imageOf(img), typeOf(href, ""))
     }
 
     private fun searchResult(title: String, href: String, poster: String?, type: TvType): SearchResponse =

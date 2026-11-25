@@ -93,7 +93,17 @@ class DdysProvider : MainAPI() {
             ?.groupValues?.get(1)?.toDoubleOrNull()?.takeIf { it > 0 }
         val actors = labelled(content, "主演").split('/', '、', ',').map { it.trim() }
             .filter { it.isNotBlank() }.take(15).map { ActorData(Actor(it)) }
-        val plot = content.select("p").map { it.text().trim() }.maxByOrNull { it.length }?.takeIf { it.length > 20 }
+        // The 剧情介绍 box holds several paragraphs; keep them all. Fall back to the longest <p>.
+        val plot = sectionAfter(document, "剧情介绍")?.select("p")
+            ?.map { it.text().trim() }?.filter { it.isNotBlank() }?.joinToString("\n\n")?.takeIf { it.length > 20 }
+            ?: content.select("p").map { it.text().trim() }.maxByOrNull { it.length }?.takeIf { it.length > 20 }
+        // 相关推荐 cards use the same markup as the list pages; they come from this page, no extra request.
+        val recommended = sectionAfter(document, "相关推荐")?.select("div.movie-card")
+            ?.mapNotNull { it.toResult() }
+            ?.filter { it.url.trimEnd('/') != url.substringBefore('#').trimEnd('/') }
+            ?.distinctBy { it.url }
+            ?.take(16)
+            .orEmpty()
 
         val sources = parseSources(document)
         if (sources.isEmpty()) throw ErrorLoadingException("此影片暂无在线播放源（可能只有网盘资源）")
@@ -113,6 +123,7 @@ class DdysProvider : MainAPI() {
                 this.tags = tags
                 this.score = rating?.let { Score.from10(it) }
                 this.actors = actors
+                this.recommendations = recommended
             }
         } else {
             val episodes = longest.episodes.mapIndexed { index, ep ->
@@ -128,6 +139,7 @@ class DdysProvider : MainAPI() {
                 this.tags = tags
                 this.score = rating?.let { Score.from10(it) }
                 this.actors = actors
+                this.recommendations = recommended
             }
         }
     }
@@ -250,6 +262,10 @@ class DdysProvider : MainAPI() {
             div.children().firstOrNull()?.text()?.trim()?.startsWith(label) == true
         }?.children()?.drop(1)?.joinToString(" ") { it.text() }.orEmpty()
 
+    /** The box that holds an `<h2>` titled [heading] (e.g. 剧情介绍, 相关推荐). */
+    private fun sectionAfter(document: Document, heading: String): Element? =
+        document.select("h2").firstOrNull { it.text().trim() == heading }?.parent()
+
     private fun imageOf(img: Element?): String? {
         if (img == null) return null
         return listOf(img.attr("data-src"), img.attr("src"))
@@ -263,7 +279,8 @@ class DdysProvider : MainAPI() {
         val title = link.text().trim().ifBlank { selectFirst("img")?.attr("alt").orEmpty() }
         if (title.isBlank()) return null
         val poster = imageOf(selectFirst("img"))
-        val kind = selectFirst("div.text-xs")?.text().orEmpty()
+        // "2023 · 剧集"; the first div.text-xs is the hidden 暂无海报 placeholder, so match on the separator.
+        val kind = select("div.text-xs").firstOrNull { it.text().contains('·') }?.text().orEmpty()
         return if (kind.contains("电影")) {
             newMovieSearchResponse(title, href, TvType.Movie) { posterUrl = poster }
         } else {

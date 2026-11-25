@@ -135,6 +135,40 @@ for (const c of [...firstPages["/trending"], ...firstPages["/movie"]].filter((c)
 assert.ok(fullMovie, "every movie detail page was behind the browser check");
 checkDetails(fullMovie, "movie (page)");
 
+// ---- TMDB mirror (mirrors tmdbDetails / trailerOf): cast photos + roles and trailer on the page
+// path, and the whole details on the challenged-page fallback (loadWithoutPage). ----
+async function mirror(tmdbId, tv) {
+  const { text } = await get(`https://api.framextv.cc/api/details?id=${tmdbId}&type=${tv ? "tv" : "movie"}`, { Referer: "https://framextv.cc/" }, 15000);
+  const d = JSON.parse(text);
+  const cast = (d.cast ?? []).filter((c) => c.name);
+  return {
+    title: d.title, plot: d.overview, poster: d.poster, backdrop: d.backdrop, year: d.year, rating: d.rating,
+    runtime: d.runtime, tags: d.genres ?? [], cast,
+    trailer: d.trailer?.key ?? d.trailers?.find((t) => !t.site || t.site === "YouTube")?.key,
+  };
+}
+{
+  const m = await mirror(fullMovie.tmdb, false);
+  const byName = new Map(m.cast.map((c) => [c.name, c]));
+  const photos = fullMovie.cast.filter((n) => byName.get(n)?.profile).length;
+  console.log(`movie (page) + mirror: cast photos ${photos}/${fullMovie.cast.length}, trailer ${m.trailer ? "yes" : "no"}`);
+  assert.ok(photos > 0, "no cast photos matched from the mirror");
+}
+{
+  // Way of the Warrior Kid (TMDB 1280115): shown through the fallback when its page is challenged.
+  const hit = JSON.parse((await get(`${MAIN}/api/suggest?q=${encodeURIComponent("way of the warrior kid")}`, { Referer: `${MAIN}/` })).text)
+    .find((x) => x.type === "movie" && x.title === "Way of the Warrior Kid");
+  assert.ok(hit, "Way of the Warrior Kid not found");
+  const id = await tmdbFromPlayer(hit.slug, false);
+  assert.equal(id, "1280115", "/api/go gave the wrong TMDB id");
+  const m = await mirror(id, false);
+  for (const key of ["title", "plot", "poster", "backdrop", "year", "rating", "runtime", "trailer"]) assert.ok(m[key], `fallback: missing ${key}`);
+  assert.ok(m.tags.length > 0 && m.cast.length > 0, "fallback: no tags or cast");
+  const photos = m.cast.filter((c) => c.profile).length;
+  assert.ok(photos > 0, "fallback: no cast photos");
+  console.log(`fallback "${m.title}" ${m.year} ★${m.rating} ${m.runtime} min [${m.tags.join(", ")}] cast ${m.cast.length} (${photos} photos), backdrop, trailer ${m.trailer}`);
+}
+
 // A well-known older movie for the stream test (VixSrc carries older titles; very new releases
 // may only be on hosts that are not usable). Its page may or may not be challenged.
 const movieSearch = JSON.parse((await get(`${MAIN}/api/suggest?q=${encodeURIComponent("fight club")}`, { Referer: `${MAIN}/` })).text);

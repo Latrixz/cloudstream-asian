@@ -130,13 +130,18 @@ class HuavodProvider : MainAPI() {
         val infoLine = { label: String ->
             document.select(".slide-info").firstOrNull { it.selectFirst("strong")?.text()?.contains(label) == true }
         }
-        val actors = infoLine("演员")?.select("a")?.map { it.text().trim() }
-            ?.filter { it.isNotBlank() }?.distinct()?.take(20)?.map { ActorData(Actor(it)) }
+        val names = { label: String, limit: Int ->
+            infoLine(label)?.select("a")?.map { it.text().trim() }?.filter { it.isNotBlank() }?.distinct()?.take(limit)
+                .orEmpty()
+        }
+        val actors = (names("演员", 20).map { ActorData(Actor(it)) } +
+            names("导演", 3).map { ActorData(Actor(it), roleString = "导演") }).ifEmpty { null }
         val status = infoLine("备注")?.ownText()?.trim()?.takeIf { it.isNotBlank() }
         val score = document.selectFirst(".detail-score .fraction")?.text()?.trim()?.toDoubleOrNull()
             ?.takeIf { it > 0 }
         val plotText = listOfNotNull(status?.let { "（$it）" }, plot).joinToString("\n").ifBlank { null }
         val type = typeOf(document)
+        val recommended = recommendations(document, detailUrl, type)
 
         val sources = parseSources(document)
         if (sources.isEmpty()) throw ErrorLoadingException("此影片暂无播放来源")
@@ -151,6 +156,7 @@ class HuavodProvider : MainAPI() {
                 this.tags = tags
                 this.score = score?.let { Score.from10(it) }
                 this.actors = actors
+                this.recommendations = recommended
             }
         } else {
             val episodes = canonical.mapIndexed { position, entry ->
@@ -166,6 +172,7 @@ class HuavodProvider : MainAPI() {
                 this.tags = tags
                 this.score = score?.let { Score.from10(it) }
                 this.actors = actors
+                this.recommendations = recommended
             }
         }
     }
@@ -231,6 +238,21 @@ class HuavodProvider : MainAPI() {
         }
         return ordered.isNotEmpty()
     }
+
+    /**
+     * The detail page's "相关影片" grid (same page, no extra request). MacCMS fills it from the same
+     * category, so items get the current title's type. The current title itself is skipped.
+     */
+    private fun recommendations(document: Document, detailUrl: String, type: TvType): List<SearchResponse> =
+        runCatching {
+            val heading = document.select("h2.this-name").firstOrNull { it.text().trim() == "相关影片" }
+                ?: return@runCatching emptyList()
+            val container = heading.parent()?.parent() ?: return@runCatching emptyList()
+            container.select(".public-list-box").mapNotNull { it.toListResult(type) }
+                .filter { it.url != detailUrl }
+                .distinctBy { it.url }
+                .take(MAX_RECOMMENDATIONS)
+        }.getOrDefault(emptyList())
 
     /** Cloudflare answers bursts (e.g. all home rows at once) with HTTP 429; back off and retry. */
     private suspend fun getPage(url: String): Document {
@@ -380,6 +402,7 @@ class HuavodProvider : MainAPI() {
 
     companion object {
         private const val LIST_PAGE_SIZE = 40
+        private const val MAX_RECOMMENDATIONS = 16
 
         // EcPlayer6.js redeems the token at ad_duration_ms - 2000; stay a little later than that.
         private const val AD_WINDOW_MARGIN_MS = 1500L

@@ -73,7 +73,30 @@ const playlist = await fetch(freeMovie.url, { headers: { Referer: "https://www.o
 assert.equal(playlist.ok, true, `HLS playlist: HTTP ${playlist.status}`);
 assert.match(await playlist.text(), /^#EXTM3U/m, "playback URL is not an HLS playlist");
 
+// Recommendations (load(): /v1/pub/vod/random/{typeId1}/{typeId}/16, non-VIP, minus the title itself).
+const recommendations = {};
+for (const [label, detail] of [["movie", movie], ["series", series]]) {
+  const random = await get(`/v1/pub/vod/random/${detail.typeId1}/${detail.typeId}/16`);
+  const usable = (random ?? []).filter((item) => !item.vip && item.id !== detail.id);
+  assert.ok(usable.length > 0, `${label} ${detail.name}: no recommendations`);
+  assert.ok(usable.every((item) => item.name && (item.picThumb || item.pic)), `${label}: recommendation without name/poster`);
+  recommendations[label] = usable.length;
+}
+
+// Background (load(): backgroundPosterUrl = picSlide, a wide banner; empty for many titles).
+const slideDetail = series.picSlide ? series : movie.picSlide ? movie : null;
+let background = "none on the two sampled titles";
+if (slideDetail) {
+  const slideUrl = `https://static.olelive.com/${slideDetail.picSlide.replace(/^\//, "")}`;
+  const image = await fetch(slideUrl, { headers: { Referer: "https://www.olevod.com/" } });
+  assert.equal(image.ok, true, `picSlide ${slideUrl}: HTTP ${image.status}`);
+  assert.match(image.headers.get("content-type") ?? "", /^image\//, "picSlide is not an image");
+  background = `${slideDetail.name}: ${slideUrl}`;
+}
+
 console.log(JSON.stringify({
+  recommendations,
+  background,
   homepageItems: home.list.length,
   fullMovieCatalogue: home.total,
   paginatedCategories: ["movies", "dramas", "variety", "anime", "short dramas"],

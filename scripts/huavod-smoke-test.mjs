@@ -89,7 +89,14 @@ async function detail(url) {
     episodes: [...box.matchAll(/href="\/vodplay\/(\d+)-(\d+)-(\d+)\.html">([^<]*)<\/a>/g)]
       .map(([, vodId, sid, nid, name]) => ({ vodId, sid: +sid, nid: +nid, name: decode(name) })),
   })).filter((source) => source.episodes.length > 0);
-  return { title, poster, plot, year, score, actors, tags, typeId, sources };
+  // HuavodProvider.recommendations(): the "相关影片" grid on the same page, minus the title itself.
+  const relStart = html.indexOf(">相关影片</h2>");
+  const relEnd = html.indexOf("相关明星", relStart);
+  const related = relStart < 0 ? [] : [...new Map(
+    [...html.slice(relStart, relEnd < 0 ? undefined : relEnd).matchAll(/<a[^>]*class="public-list-exp"[^>]*href="(\/voddetail\/\d+\.html)"[^>]*title="([^"]*)"[^>]*>\s*(<img[^>]*>)/g)]
+      .map(([, href, name, img]) => [BASE + href, { url: BASE + href, title: decode(name), poster: imageOf(img) }]),
+  ).values()].filter((item) => item.url !== url.split("#")[0] && item.title).slice(0, 16);
+  return { title, poster, plot, year, score, actors, tags, typeId, sources, related };
 }
 
 // loadLinks(): token per source → one ad-window wait → redeem → verify #EXTM3U
@@ -213,6 +220,11 @@ async function checkDetail(url, kind) {
   assert.ok(d.poster && (await imageOk(d.poster)), `${url}: poster missing or broken (${d.poster})`);
   assert.ok(d.plot.length > 10, `${url}: no plot`);
   assert.ok(d.sources.length > 0, `${url}: no sources`);
+  assert.ok(d.related.length > 0, `${url}: no 相关影片 recommendations`);
+  assert.ok(d.related.every((item) => item.poster), `${url}: recommendation without poster`);
+  console.log(`${kind} ${d.title}: ${d.related.length} recommendations (${d.related.slice(0, 3).map((i) => i.title).join(", ")})`);
+  // Same /voddetail/{id}.html links as the list rows, so load() opens them (not fetched again: Cloudflare 429s bursts).
+  assert.ok(d.related.every((item) => /^https:\/\/huavod\.com\/voddetail\/\d+\.html$/.test(item.url)), `${url}: odd recommendation URL`);
   console.log(`${kind} ${d.title}: year ${d.year}, score ${d.score}, ${d.actors.length} actors, tags [${d.tags.slice(0, 4).join(" ")}], ` +
     `sources ${d.sources.map((s) => `${s.label}(${s.episodes.length})`).join(" ")}`);
   return d;

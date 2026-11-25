@@ -23,6 +23,7 @@ class KubbProvider : MainAPI() {
     )
 
     private val listApi = "https://m10.kubb.tv/api"
+    private val rankApi = "https://rankv21.kubb.tv/api"
     private val videoApi = "https://m10.kubb.tv/v3"
     private val browserUserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -145,11 +146,17 @@ class KubbProvider : MainAPI() {
         if (freeEpisodes.isEmpty()) throw ErrorLoadingException("此影片没有可播放的非 VIP 片源")
 
         val type = typeFor(video.cid)
-        val tags = (listOf(video.channel, video.regional, video.language) + video.videoType.split(','))
+        val tags = (
+            listOf(video.channel, video.regional, video.language) +
+                video.videoType.split(',') + video.cidMapper.split(',')
+            )
             .map { it.trim() }
             .filter { it.isNotBlank() }
             .distinct()
-        val actors = video.stars.filter { it.isNotBlank() }.take(15).map { ActorData(Actor(it)) }
+        val actors = video.stars.map { it.trim() }.filter { it.isNotBlank() }.distinct().take(15)
+            .map { ActorData(Actor(it)) } +
+            video.directors.map { it.trim() }.filter { it.isNotBlank() }.distinct().take(3)
+                .map { ActorData(Actor(it), roleString = "导演") }
         val score = video.score.toDoubleOrNull()?.takeIf { it > 0 }?.let { Score.from10(it) }
         val basePlot = video.contxt.replace(Regex("<[^>]+>"), "").trim()
         val plotText = if (type != TvType.Movie && freeEpisodes.size < allEpisodes.size) {
@@ -158,9 +165,8 @@ class KubbProvider : MainAPI() {
             basePlot
         }
         val year = video.postYear.toIntOrNull()
-        // The detail API sometimes points at a small "...s.gif" variant that doesn't exist (HTTP 404);
-        // the full-size file without the "s" is what the list API uses and always loads.
-        val poster = video.imgPath.ifBlank { null }?.replace(Regex("""(/\d{15,})s(\.\w+)$"""), "$1$2")
+        val poster = fullImage(video.imgPath)
+        val recommended = recommendations(video, key)
 
         return if (type == TvType.Movie) {
             newMovieLoadResponse(video.title, url, type, freeEpisodes.first().key) {
@@ -170,6 +176,7 @@ class KubbProvider : MainAPI() {
                 this.tags = tags
                 this.score = score
                 this.actors = actors
+                this.recommendations = recommended
             }
         } else {
             val episodes = freeEpisodes.mapIndexed { position, episode ->
@@ -185,9 +192,57 @@ class KubbProvider : MainAPI() {
                 this.tags = tags
                 this.score = score
                 this.actors = actors
+                this.recommendations = recommended
             }
         }
     }
+
+    /**
+     * The detail page's "相关视频" (rankv21 home/getRelativeVideo, size 10 like the site) followed by
+     * "猜你喜欢" (List/GuessYouLike for the same category). Failures only drop the row.
+     */
+    private suspend fun recommendations(video: VideoDetail, key: String): List<SearchResponse> {
+        val self = "$mainUrl/play/${video.key.ifBlank { key }}"
+        // Both requests run in parallel; related videos come first, like on the site.
+        return listOf(0, 1).amap { if (it == 0) relatedVideos(video) else guessYouLike(video.cid) }
+            .flatten()
+            .filter { it.url != self }
+            .distinctBy { it.url }
+            .take(MAX_RECOMMENDATIONS)
+    }
+
+    private suspend fun relatedVideos(video: VideoDetail): List<SearchResponse> = runCatching {
+        val response = app.get(
+            signed(
+                "$rankApi/home/getRelativeVideo",
+                linkedMapOf(
+                    "cinema" to "1",
+                    "cid" to video.cid,
+                    "title" to video.title,
+                    "size" to "10",
+                    "set" to "1",
+                    "id" to video.id,
+                ),
+            ),
+            headers = apiHeaders,
+        ).parsed<RelatedApiResponse>()
+        val items: List<RelatedItem> = if (response.data?.code == 0) response.data.info.orEmpty().filterNotNull() else emptyList()
+        items.mapNotNull { it.toSearchResponse() }
+    }.getOrDefault(emptyList())
+
+    private suspend fun guessYouLike(cid: String): List<SearchResponse> = runCatching {
+        val response = app.get(
+            signed("$listApi/List/GuessYouLike", linkedMapOf("cinema" to "1", "CID" to cid, "PageSize" to "35")),
+            headers = apiHeaders,
+        ).parsed<GuessApiResponse>()
+        val items: List<ListItem> = if (response.data?.code == 0) response.data.info.orEmpty().filterNotNull() else emptyList()
+        items.filter { it.key.isNotBlank() && it.title.isNotBlank() }.map { it.toSearchResponse() }
+    }.getOrDefault(emptyList())
+
+    // The API sometimes points at a small "...s.gif" variant that doesn't exist (HTTP 404);
+    // the full-size file without the "s" is what the list API uses and always loads.
+    private fun fullImage(raw: String): String? =
+        raw.ifBlank { null }?.replace(Regex("""(/\d{15,})s(\.\w+)$"""), "$1$2")
 
     override suspend fun loadLinks(
         data: String,
@@ -280,6 +335,17 @@ class KubbProvider : MainAPI() {
         }
     }
 
+    private fun RelatedItem.toSearchResponse(): SearchResponse? {
+        if (contxt.isBlank() || title.isBlank()) return null
+        val loadUrl = "$mainUrl/play/$contxt"
+        // Related items carry no category id; series have an episode count in lastName ("40集全").
+        return if (isSerial || lastName.contains('集') || lastName.contains("更新")) {
+            newTvSeriesSearchResponse(title, loadUrl, TvType.TvSeries) { posterUrl = fullImage(imgPath) }
+        } else {
+            newMovieSearchResponse(title, loadUrl, TvType.Movie) { posterUrl = fullImage(imgPath) }
+        }
+    }
+
     /**
      * Reproduces the website's request signature: vv = md5(pub & lowercase(query) & privateKey),
      * where pub is the current time in milliseconds and the private key is picked by pub % 8.
@@ -300,6 +366,7 @@ class KubbProvider : MainAPI() {
 
     companion object {
         private const val PAGE_SIZE = 24
+        private const val MAX_RECOMMENDATIONS = 16
         private val PRIVATE_KEYS = listOf(
             "version001", "vers1on001", "vers1on00i", "bersion001",
             "vcrsion001", "versi0n001", "versio_001", "version0o1",
@@ -343,6 +410,7 @@ data class DetailApiData(
 ) : ApiStatus
 
 data class VideoDetail(
+    val id: String = "",
     val key: String = "",
     val title: String = "",
     val imgPath: String = "",
@@ -355,6 +423,32 @@ data class VideoDetail(
     val score: String = "",
     @JsonProperty("post_Year") val postYear: String = "",
     val stars: List<String> = emptyList(),
+    val directors: List<String> = emptyList(),
+    val cidMapper: String = "",
+)
+
+data class RelatedApiResponse(val ret: Int = 0, val data: RelatedApiData? = null)
+
+data class RelatedApiData(
+    val code: Int = -1,
+    val msg: String = "",
+    val info: List<RelatedItem?>? = null,
+)
+
+data class RelatedItem(
+    val contxt: String = "",
+    val title: String = "",
+    val imgPath: String = "",
+    val lastName: String = "",
+    val isSerial: Boolean = false,
+)
+
+data class GuessApiResponse(val ret: Int = 0, val data: GuessApiData? = null)
+
+data class GuessApiData(
+    val code: Int = -1,
+    val msg: String = "",
+    val info: List<ListItem?>? = null,
 )
 
 data class PlaylistApiResponse(val ret: Int = 0, val data: PlaylistApiData? = null)

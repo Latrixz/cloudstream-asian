@@ -3,6 +3,7 @@ package com.flixvision
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
@@ -148,33 +149,46 @@ class FlixvisionProvider : MainAPI() {
         val tmdbId = document.selectFirst("#cm-root")?.attr("data-id")?.takeIf { it.isNotBlank() }
         val recommendations = document.select("a.bf-card").mapNotNull { it.toCard() }
             .filter { it.url != pageUrl }.distinctBy { it.url }
+        // The page lists cast names only; photos, roles and the trailer come from the TMDB mirror.
+        val meta = tmdbId?.let { tmdbDetails(it, isTv) }
+        val metaCast = meta?.get("cast")?.mapNotNull { c -> c.str("name")?.let { it to c } }?.toMap().orEmpty()
+        val actors = actorNames.ifEmpty { metaCast.keys.take(15) }.map { actorName ->
+            val c = metaCast[actorName]
+            ActorData(Actor(actorName, c?.str("profile")), roleString = c?.str("character"))
+        }
+        val trailer = trailerOf(meta)
+        val backdrop = background ?: meta?.str("backdrop")
+        val score = (rating ?: meta?.str("rating")?.toDoubleOrNull())?.takeIf { it > 0 }?.let { Score.from10(it) }
+        val runtime = duration ?: meta?.get("runtime")?.asInt()?.takeIf { it > 0 }
 
         if (!isTv) {
             val data = if (tmdbId != null) "$pageUrl?tmdb=$tmdbId" else pageUrl
             return newMovieLoadResponse(title, pageUrl, TvType.Movie, data) {
                 posterUrl = poster
-                backgroundPosterUrl = background
+                backgroundPosterUrl = backdrop
                 this.plot = plot
                 this.year = year
                 this.tags = tags
-                this.duration = duration
-                this.score = rating?.let { Score.from10(it) }
-                this.actors = actorNames.map { ActorData(Actor(it)) }
+                this.duration = runtime
+                this.score = score
+                this.actors = actors
                 this.recommendations = recommendations
+                addTrailer(trailer)
             }
         }
 
         val episodes = buildEpisodes(document, pageUrl, tmdbId)
         return newTvSeriesLoadResponse(title, pageUrl, TvType.TvSeries, episodes) {
             posterUrl = poster
-            backgroundPosterUrl = background
+            backgroundPosterUrl = backdrop
             this.plot = plot
             this.year = year
             this.tags = tags
-            this.duration = duration
-            this.score = rating?.let { Score.from10(it) }
-            this.actors = actorNames.map { ActorData(Actor(it)) }
+            this.duration = runtime
+            this.score = score
+            this.actors = actors
             this.recommendations = recommendations
+            addTrailer(trailer)
         }
     }
 
@@ -289,7 +303,7 @@ class FlixvisionProvider : MainAPI() {
      * browser challenge. That challenge is not solved here. Instead the title is shown from the
      * site's unchallenged endpoints: the autocomplete API (title, year, poster) and the player's
      * own `/api/go` redirect (TMDB id), with seasons from the episode API. Plot, cast and rating
-     * are only on the detail page, so they are missing in this case.
+     * are only on the detail page, so they are filled from an open TMDB mirror instead.
      */
     private suspend fun loadWithoutPage(pageUrl: String): LoadResponse {
         val slug = slugOf(pageUrl)
@@ -302,16 +316,66 @@ class FlixvisionProvider : MainAPI() {
         val title = hit?.name ?: words.split(' ').joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
         val year = (hit as? MovieSearchResponse)?.year ?: (hit as? TvSeriesSearchResponse)?.year
         val poster = hit?.posterUrl?.replace("/w342/", "/w500/")
+        // The detail page is blocked, so fill plot, cast, rating and genres from an open TMDB mirror.
+        val meta = tmdbDetails(tmdbId, isTv)
+        val name = meta?.str("title") ?: title
+        val plot = meta?.str("overview")
+        val score = meta?.get("rating")?.asDouble()?.takeIf { it > 0 }?.let { Score.from10(it) }
+        val tags = meta?.get("genres")?.mapNotNull { it.asText().takeIf { g -> g.isNotBlank() } }.orEmpty()
+        val cast = meta?.get("cast")?.mapNotNull { c ->
+            val actorName = c.str("name") ?: return@mapNotNull null
+            ActorData(Actor(actorName, c.str("profile")), roleString = c.str("character"))
+        }.orEmpty().take(15)
+        val metaYear = meta?.get("year")?.asInt()?.takeIf { it > 0 }
+        val metaPoster = meta?.str("poster")
+        val backdrop = meta?.str("backdrop")
         if (!isTv) {
-            return newMovieLoadResponse(title, pageUrl, TvType.Movie, "$pageUrl?tmdb=$tmdbId") {
-                posterUrl = poster
-                this.year = year
+            return newMovieLoadResponse(name, pageUrl, TvType.Movie, "$pageUrl?tmdb=$tmdbId") {
+                posterUrl = poster ?: metaPoster
+                backgroundPosterUrl = backdrop
+                this.year = year ?: metaYear
+                this.plot = plot
+                this.score = score
+                this.tags = tags
+                this.actors = cast
+                this.duration = meta?.get("runtime")?.asInt()?.takeIf { it > 0 }
+                addTrailer(trailerOf(meta))
             }
         }
-        return newTvSeriesLoadResponse(title, pageUrl, TvType.TvSeries, buildEpisodes(null, pageUrl, tmdbId)) {
-            posterUrl = poster
-            this.year = year
+        return newTvSeriesLoadResponse(name, pageUrl, TvType.TvSeries, buildEpisodes(null, pageUrl, tmdbId)) {
+            posterUrl = poster ?: metaPoster
+            backgroundPosterUrl = backdrop
+            this.year = year ?: metaYear
+            this.plot = plot
+            this.score = score
+            this.tags = tags
+            this.actors = cast
+            addTrailer(trailerOf(meta))
         }
+    }
+
+    /** YouTube trailer from the TMDB mirror's `trailer` object or `trailers` list. */
+    private fun trailerOf(meta: JsonNode?): String? {
+        val key = meta?.get("trailer")?.str("key")
+            ?: meta?.get("trailers")?.firstOrNull { it.str("site") == null || it.str("site") == "YouTube" }?.str("key")
+        return key?.let { "https://www.youtube.com/watch?v=$it" }
+    }
+
+    /** TMDB details (title, overview, rating, genres, runtime, cast) from an open, key-less mirror. */
+    private suspend fun tmdbDetails(tmdbId: String, isTv: Boolean): JsonNode? {
+        val type = if (isTv) "tv" else "movie"
+        for (host in listOf("https://api.framextv.cc", "https://api.framextv.xyz")) {
+            val node = runCatching {
+                val text = app.get(
+                    "$host/api/details?id=$tmdbId&type=$type",
+                    headers = mapOf("User-Agent" to userAgent, "Referer" to "https://framextv.cc/"),
+                    timeout = 10L,
+                ).text
+                jsonMapper.readTree(text)
+            }.getOrNull()
+            if (node != null && node.str("title") != null) return node
+        }
+        return null
     }
 
     /** The play button's `/api/go` answers with a redirect to `<host>/.../<tmdbId>`; read the id from it. */

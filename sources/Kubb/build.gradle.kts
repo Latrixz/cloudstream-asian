@@ -1,5 +1,5 @@
 // Use an integer for version numbers
-version = 3
+version = 4
 
 cloudstream {
     iconUrl = "https://www.google.com/s2/favicons?domain=kubb.tv&sz=%size%"
