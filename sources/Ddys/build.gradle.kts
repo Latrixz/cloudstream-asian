@@ -2,7 +2,7 @@
 version = 2
 
 cloudstream {
-    iconUrl = "https://www.google.com/s2/favicons?domain=ddys.io&sz=%size%"
+    iconUrl = "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Ddys.png"
     description = "低端影视 ddys：电影、剧集、综艺和动漫（需通过 Cloudflare 验证）"
     authors = listOf("cloudstream-asian")
     status = 1

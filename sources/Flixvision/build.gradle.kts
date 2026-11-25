@@ -2,7 +2,7 @@
 version = 2
 
 cloudstream {
-    iconUrl = "https://www.google.com/s2/favicons?domain=flixvision.st&sz=%size%"
+    iconUrl = "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Flixvision.png"
     description = "FlixVision (flixvision.st): free movies and TV shows in English"
     authors = listOf("cloudstream-asian")
 

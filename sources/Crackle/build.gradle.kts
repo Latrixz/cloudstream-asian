@@ -2,7 +2,7 @@
 version = 2
 
 cloudstream {
-    iconUrl = "https://www.google.com/s2/favicons?domain=crackle.beauty&sz=%size%"
+    iconUrl = "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Crackle.png"
     description = "Crackle (crackle.beauty): movies and TV series from the TMDB catalogue, streamed via VixSrc"
     authors = listOf("cloudstream-asian")
 

@@ -2,7 +2,7 @@
 version = 1
 
 cloudstream {
-    iconUrl = "https://www.google.com/s2/favicons?domain=kissasian.ng&sz=%size%"
+    iconUrl = "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Kissasian.png"
     description = "Kissasian (kissasian.ng): Korean, Chinese, Japanese and Thai dramas and movies with English subtitles"
     authors = listOf("cloudstream-asian")
 

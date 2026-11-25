@@ -2,7 +2,7 @@
 version = 1
 
 cloudstream {
-    iconUrl = "https://www.google.com/s2/favicons?domain=framextv.cc&sz=%size%"
+    iconUrl = "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Framextv.png"
     description = "frameXTV (framextv.cc): movies and TV series from the TMDB catalogue, streamed from the site's own multi-server backend"
     authors = listOf("cloudstream-asian")
 

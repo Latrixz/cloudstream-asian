@@ -2,7 +2,7 @@
 version = 2
 
 cloudstream {
-    iconUrl = "https://www.google.com/s2/favicons?domain=mvffm.net&sz=%size%"
+    iconUrl = "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Mvffm.png"
     description = "Movieffm 電影線上看：電影、連續劇、綜藝、動漫和紀錄片"
     authors = listOf("cloudstream-asian")
 

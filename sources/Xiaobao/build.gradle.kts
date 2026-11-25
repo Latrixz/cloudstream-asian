@@ -2,7 +2,7 @@
 version = 2
 
 cloudstream {
-    iconUrl = "https://www.google.com/s2/favicons?domain=xiaobaotv.com&sz=%size%"
+    iconUrl = "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Xiaobao.png"
     description = "小宝影院 Xiaobao：电影、电视剧、综艺、动漫、短剧和纪录片"
     authors = listOf("cloudstream-asian")
 

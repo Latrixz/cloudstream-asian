@@ -2,7 +2,7 @@
 version = 1
 
 cloudstream {
-    iconUrl = "https://www.google.com/s2/favicons?domain=iptv-org.github.io&sz=%size%"
+    iconUrl = "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/LiveTv.png"
     description = "Free, publicly available live TV channels from the iptv-org project"
     authors = listOf("cloudstream-asian")
 

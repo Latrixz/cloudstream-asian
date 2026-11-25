@@ -2,7 +2,7 @@
 version = 2
 
 cloudstream {
-    iconUrl = "https://www.google.com/s2/favicons?domain=dbku.tv&sz=%size%"
+    iconUrl = "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Duboku.png"
     description = "独播库 Duboku：电影、连续剧（陆剧、日韩剧、台泰剧）、短剧、综艺和动漫"
     authors = listOf("cloudstream-asian")
 

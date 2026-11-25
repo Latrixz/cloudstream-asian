@@ -2,7 +2,7 @@
 version = 3
 
 cloudstream {
-    iconUrl = "https://www.google.com/s2/favicons?domain=len.tv&sz=%size%"
+    iconUrl = "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Len.png"
     description = "冷映 Len：电影、电视剧、国产剧、欧美剧、韩剧、日剧、港台剧、泰剧和动漫"
     authors = listOf("cloudstream-asian")
 

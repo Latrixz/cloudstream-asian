@@ -2,7 +2,7 @@
 version = 4
 
 cloudstream {
-    iconUrl = "https://www.google.com/s2/favicons?domain=kubb.tv&sz=%size%"
+    iconUrl = "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Kubb.png"
     description = "酷播 Kubb：电影、电视剧、综艺、动漫、纪录片和短剧"
     authors = listOf("cloudstream-asian")
 
