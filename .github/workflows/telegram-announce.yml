@@ -1,0 +1,22 @@
+name: Announce on Telegram
+# Post any message to the @csasian channel through the bot: Actions → "Announce on Telegram" → Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "Message to post on @csasian"
+        required: true
+permissions: {}
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Telegram
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          MESSAGE: ${{ github.event.inputs.message }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=@csasian" \
+            --data-urlencode "text=${MESSAGE}" \
+            --data-urlencode "disable_web_page_preview=true" | python3 -c "import json,sys;d=json.load(sys.stdin);print('ok:',d.get('ok'),d.get('description',''))"
