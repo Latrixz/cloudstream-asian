@@ -53,6 +53,9 @@ If these sources are useful to you, you can support their upkeep:
 | Crackle | crackle.beauty | English |
 | Flixvision | flixvision.st | English |
 | Framextv (frameXTV) | framextv.cc | English |
+| Rivestream | rivestream.app | English (movies, TV, K-drama, anime) |
+| Rivo | rivo.st | English |
+| Movy | movy.sx | English |
 | LiveTv (直播 Live TV) | iptv-org.github.io | Live TV (free channels) |
 | AsianHome (CS Asian 首页) | — | Combined home screen and search across your sources |
 

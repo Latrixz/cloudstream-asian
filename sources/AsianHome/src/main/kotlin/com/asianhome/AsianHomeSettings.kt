@@ -429,6 +429,8 @@ class AsianHomeSettings(
                 background = Ui.rounded(Ui.CARD, dpf(14f))
                 setPadding(dp(12), dp(8), dp(10), dp(8))
                 clipChildren = false
+                // The focused button grows a little; let it draw into the padding instead of being cut.
+                clipToPadding = false
             }
             line.addView(
                 Ui.text(context, "${index + 1}", 12f, Ui.TEXT_2, Ui.BOLD).apply {

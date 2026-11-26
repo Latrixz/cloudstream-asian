@@ -36,7 +36,7 @@ object CsBackup {
     /** Our sources, by the name each one shows in CloudStream. */
     private val OURS = setOf(
         "欧乐影院 Olevod", "酷播 Kubb", "Movieffm", "冷映 Len", "华视影院 Huavod", "低端影视 ddys",
-        "独播库 Duboku", "小宝影院 Xiaobao", "Kissasian", "Crackle", "FlixVision", "frameXTV",
+        "独播库 Duboku", "小宝影院 Xiaobao", "Kissasian", "Crackle", "FlixVision", "frameXTV", "Rivestream", "Rivo", "Movy",
     )
     private const val MARKER = "csasian-backup"
     const val ENABLED_KEY = "csasian_backup_links"
@@ -179,7 +179,7 @@ object CsBackup {
             val label = "备用 ${api.name}"
             synchronized(links) { links.toList() }.forEach { l ->
                 callback(
-                    newExtractorLink(label, "$label · ${l.name}", l.url, l.type) {
+                    newExtractorLink(label, "$label · ${l.name.removePrefix(api.name).trim().ifEmpty { l.name }}", l.url, l.type) {
                         referer = l.referer
                         quality = l.quality
                         headers = l.headers

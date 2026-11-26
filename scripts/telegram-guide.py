@@ -26,6 +26,7 @@ NAMES = {
     "Olevod": "Olevod", "Kubb": "Kubb", "Mvffm": "Movieffm", "Len": "Len", "Huavod": "Huavod",
     "Ddys": "Ddys", "Duboku": "Duboku", "Xiaobao": "Xiaobao", "Kissasian": "Kissasian",
     "Crackle": "Crackle", "Flixvision": "FlixVision", "Framextv": "FrameXTV",
+    "Rivestream": "Rivestream", "Rivo": "Rivo", "Movy": "Movy",
     "LiveTv": "直播 Live TV", "AsianHome": "CS Asian 首页",
 }
 ASIAN_DRAMA_EN = {"Kissasian"}

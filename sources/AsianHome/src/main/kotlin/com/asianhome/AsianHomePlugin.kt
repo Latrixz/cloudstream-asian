@@ -10,16 +10,17 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class AsianHomePlugin : Plugin() {
     override fun load(context: Context) {
         val store = AsianHomeStore(context.applicationContext ?: context)
-        val provider = AsianHomeProvider(store)
-        registerMainAPI(provider)
-
-        openSettings = { ctx ->
+        lateinit var provider: AsianHomeProvider
+        val open: (Context) -> Unit = { ctx ->
             try {
                 AsianHomeSettings(ctx, store, provider.name) { reloadHome(ctx) }.show()
             } catch (e: Throwable) {
                 Toast.makeText(ctx, "CS Asian 首页: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
+        provider = AsianHomeProvider(store, open)
+        registerMainAPI(provider)
+        openSettings = open
     }
 
     /** Asks the app to rebuild the home screen, which reads the provider's mainPage again. */

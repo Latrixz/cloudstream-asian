@@ -17,6 +17,8 @@ import com.lagradost.cloudstream3.TvSeriesSearchResponse
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.amap
 import com.lagradost.cloudstream3.newHomePageResponse
+import com.lagradost.cloudstream3.newMovieLoadResponse
+import com.lagradost.cloudstream3.newMovieSearchResponse
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
@@ -27,7 +29,11 @@ import java.net.URI
  * own source, and the items are passed through untouched, so their apiName still points at that
  * source: CloudStream opens them there, never here.
  */
-class AsianHomeProvider(private val store: AsianHomeStore) : MainAPI() {
+class AsianHomeProvider(
+    private val store: AsianHomeStore,
+    /** Opens the settings screen (set by the plugin). */
+    private val openSetup: (android.content.Context) -> Unit = {},
+) : MainAPI() {
     override var name = "CS Asian 首页"
     override var mainUrl = "https://github.com/Latrixz/cloudstream-asian"
     override var lang = "zh"
@@ -67,9 +73,7 @@ class AsianHomeProvider(private val store: AsianHomeStore) : MainAPI() {
     }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
-        if (request.data.isBlank()) {
-            throw ErrorLoadingException("还没有选择栏目：点上方「CS Asian 首页」旁的设置按钮选择你的栏目。 No rows yet: press the settings button next to \"CS Asian 首页\" at the top to pick your rows.")
-        }
+        if (request.data.isBlank()) return welcomePage()
         // Each row is caught on its own: one failing source must not blank the whole home screen.
         return try {
             val node = mapper.readTree(request.data)
@@ -93,6 +97,20 @@ class AsianHomeProvider(private val store: AsianHomeStore) : MainAPI() {
         } catch (_: Throwable) {
             null
         }
+    }
+
+    /** Shown instead of an error while no rows are chosen: a welcome card plus the installed sources. */
+    private suspend fun welcomePage(): HomePageResponse {
+        val setup = newMovieSearchResponse("⚙ 选择你的首页栏目 · Pick your home rows", "$mainUrl/#setup", TvType.Others) {
+            posterUrl = AsianHomeLogos.REPO_LOGO
+        }
+        val sources = Sources.installed(name).sortedBy { it.name.lowercase() }.map { api ->
+            val logo = try { AsianHomeLogos.candidates(api).firstOrNull() } catch (_: Throwable) { null }
+            newMovieSearchResponse(api.name, "$mainUrl/#setup", TvType.Others) { posterUrl = logo }
+        }
+        val rows = mutableListOf(HomePageList("👋 欢迎使用 CS Asian 首页 · Welcome: pick the rows you want to see", listOf(setup), false))
+        if (sources.isNotEmpty()) rows += HomePageList("你的片源 · Your sources (select one to start)", sources, false)
+        return newHomePageResponse(rows, false)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
@@ -142,6 +160,15 @@ class AsianHomeProvider(private val store: AsianHomeStore) : MainAPI() {
     // Items keep their original apiName, so the app never calls these. They are only a fallback,
     // for a URL that belongs to one of the installed sources.
     override suspend fun load(url: String): LoadResponse? {
+        if (url.endsWith("#setup")) {
+            // Only a page here: TVs call load() just from highlighting a card (for the preview), so
+            // the settings screen opens from the ▶ button instead (see loadLinks).
+            return newMovieLoadResponse("选择你的首页栏目 · Pick your home rows", url, TvType.Others, url) {
+                posterUrl = AsianHomeLogos.REPO_LOGO
+                plot = "按 ▶ 打开设置：选择片源，再选它的栏目，最后按「保存」。\n\n" +
+                    "Press ▶ to open the settings: pick a source, choose its rows, then press Save."
+            }
+        }
         val api = sourceForUrl(url) ?: throw ErrorLoadingException(NOT_HERE)
         return api.load(url)
     }
@@ -152,8 +179,25 @@ class AsianHomeProvider(private val store: AsianHomeStore) : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
     ): Boolean {
+        if (data.endsWith("#setup")) {
+            openSetupScreen()
+            throw ErrorLoadingException("已打开设置 · Settings opened")
+        }
         val api = sourceForUrl(data) ?: throw ErrorLoadingException(NOT_HERE)
         return api.loadLinks(data, isCasting, subtitleCallback, callback)
+    }
+
+    /** Opens the settings screen over whatever is showing (the player's loading screen). */
+    private fun openSetupScreen() {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            try {
+                var c: android.content.Context? = com.lagradost.cloudstream3.CloudStreamApp.context
+                while (c is android.content.ContextWrapper && c !is android.app.Activity) c = c.baseContext
+                val act = com.lagradost.cloudstream3.CommonActivity.activity ?: (c as? android.app.Activity)
+                act?.let { openSetup(it) }
+            } catch (_: Throwable) {
+            }
+        }
     }
 
     private fun sourceForUrl(url: String): MainAPI? {
