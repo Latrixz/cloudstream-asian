@@ -36,7 +36,7 @@ object CsBackup {
     /** Our sources, by the name each one shows in CloudStream. */
     private val OURS = setOf(
         "欧乐影院 Olevod", "酷播 Kubb", "Movieffm", "冷映 Len", "华视影院 Huavod", "华人影院 Huarw", "泥巴影院 Nbyy", "华视界 Haotv", "随便看 Suikan", "爱瓜TV Aigua", "低端影视 ddys",
-        "独播库 Duboku", "小宝影院 Xiaobao", "Kissasian", "Crackle", "FlixVision", "frameXTV", "Rivestream", "Rivo", "Movy",
+        "独播库 Duboku", "小宝影院 Xiaobao", "Kissasian", "Crackle", "FlixVision", "frameXTV", "Rivestream", "Rivo", "Movy", "OneTouchTV Asia", "Kisskh Asia", "Donghuastream CS", "4KHDHub CS", "AniKoto CS", "AnimeSuge CS",
     )
     /** Sources whose links only play through their own video interceptor (e.g. Haotv decrypts and
      *  cleans its segments): never offered as backups under another source. */

@@ -1,6 +1,7 @@
 package com.nbyy
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsQuality
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -275,11 +276,13 @@ class NbyyProvider : MainAPI() {
             newMovieSearchResponse(title, href, type) {
                 posterUrl = poster
                 this.score = score?.let { Score.from10(it) }
+                quality = CsQuality.from(remark)
             }
         } else {
             newTvSeriesSearchResponse(title, href, type) {
                 posterUrl = poster
                 this.score = score?.let { Score.from10(it) }
+                quality = CsQuality.from(remark)
             }
         }
     }

@@ -20,6 +20,8 @@ NAMES = {
     "Kissasian": "Kissasian", "Crackle": "Crackle", "Flixvision": "FlixVision", "Framextv": "FrameXTV",
     "Rivestream": "Rivestream", "Rivo": "Rivo", "Movy": "Movy",
     "Huarw": "华人影院 Huarw", "Nbyy": "泥巴影院 Nbyy", "Haotv": "华视界 Haotv", "Suikan": "随便看 Suikan", "Aigua": "爱瓜TV Aigua",
+    "OneTouchTV": "OneTouchTV Asia", "Kisskh": "Kisskh Asia", "Donghuastream": "Donghuastream CS",
+    "AniKoto": "AniKoto CS", "AnimeSuge": "AnimeSuge CS", "FourKHDHub": "4KHDHub CS",
     "LiveTv": "直播 Live TV", "AsianHome": "CS Asian 首页",
 }
 

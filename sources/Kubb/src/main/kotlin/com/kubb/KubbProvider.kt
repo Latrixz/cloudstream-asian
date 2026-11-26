@@ -1,6 +1,7 @@
 package com.kubb
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsQuality
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
@@ -335,7 +336,7 @@ class KubbProvider : MainAPI() {
     private fun ListItem.toSearchResponse(): SearchResponse {
         val loadUrl = "$mainUrl/play/$key"
         val type = typeFor(videoClassID)
-        val itemQuality = getQualityFromString(vipResource)
+        val itemQuality = CsQuality.from(vipResource)
         return if (type == TvType.Movie) {
             newMovieSearchResponse(title, loadUrl, type) {
                 posterUrl = image.ifBlank { null }

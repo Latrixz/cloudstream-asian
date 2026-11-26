@@ -28,20 +28,25 @@ NAMES = {
     "Crackle": "Crackle", "Flixvision": "FlixVision", "Framextv": "FrameXTV",
     "Rivestream": "Rivestream", "Rivo": "Rivo", "Movy": "Movy",
     "Huarw": "华人影院 Huarw", "Nbyy": "泥巴影院 Nbyy", "Haotv": "华视界 Haotv", "Suikan": "随便看 Suikan", "Aigua": "爱瓜TV Aigua",
+    "OneTouchTV": "OneTouchTV Asia", "Kisskh": "Kisskh Asia", "Donghuastream": "Donghuastream CS",
+    "AniKoto": "AniKoto CS", "AnimeSuge": "AnimeSuge CS", "FourKHDHub": "4KHDHub CS",
     "LiveTv": "直播 Live TV", "AsianHome": "CS Asian 首页",
 }
-ASIAN_DRAMA_EN = {"Kissasian"}
+ASIAN_DRAMA_EN = {"Kissasian", "OneTouchTV", "Kisskh"}
+ANIME = {"AniKoto", "AnimeSuge", "Donghuastream"}
 SPECIAL = {"LiveTv", "AsianHome"}
 
 
 def sections(plugins):
-    zh, asian, en, other = [], [], [], []
+    zh, asian, en, other, anime = [], [], [], [], []
     for p in sorted(plugins, key=lambda p: p["internalName"].lower()):
         key = p["internalName"]
         if key in SPECIAL:
             continue
         name = NAMES.get(key, p.get("name") or key)
-        if key in ASIAN_DRAMA_EN:
+        if key in ANIME:
+            anime.append(name)
+        elif key in ASIAN_DRAMA_EN:
             asian.append(name)
         elif (p.get("language") or "").startswith("zh"):
             zh.append(name)
@@ -50,11 +55,11 @@ def sections(plugins):
         else:
             other.append(name)
     keys = {p["internalName"] for p in plugins}
-    return zh, asian, en, other, "LiveTv" in keys, "AsianHome" in keys
+    return zh, asian, en, other, anime, "LiveTv" in keys, "AsianHome" in keys
 
 
 def guide(plugins):
-    zh, asian, en, other, live, home = sections(plugins)
+    zh, asian, en, other, anime, live, home = sections(plugins)
     src = []
     if zh:
         src.append("🇨🇳 " + " · ".join(zh))
@@ -62,6 +67,8 @@ def guide(plugins):
         src.append("🌏 " + " · ".join(asian) + " (Asian dramas, English subs)")
     if en:
         src.append("🇬🇧 " + " · ".join(en))
+    if anime:
+        src.append("🎌 " + " · ".join(anime) + " (anime & 国漫 donghua)")
     if other:
         src.append("🌐 " + " · ".join(other))
     if live:

@@ -1,6 +1,7 @@
 package com.suikan
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsQuality
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -76,7 +77,7 @@ class SuikanProvider : MainAPI() {
                     ?: return@mapNotNull null
                 val title = banner.text("title").ifBlank { return@mapNotNull null }
                 val remark = banner.text("remarks")
-                searchResult(title, detailUrl(id), banner.text("image_url").ifBlank { null }, guessType(remark))
+                searchResult(title, detailUrl(id), banner.text("image_url").ifBlank { null }, guessType(remark), remark)
             }?.distinctBy { it.url }.orEmpty()
             return newHomePageResponse(request.name, items, false)
         }
@@ -390,14 +391,15 @@ class SuikanProvider : MainAPI() {
         val title = text("title").ifBlank { return null }
         val poster = text("poster_url").ifBlank { text("poster") }.ifBlank { null }
         val type = if (typeId == 0) guessType(text("remarks")) else typeOf(typeId)
-        return searchResult(title, detailUrl(id), poster, type)
+        return searchResult(title, detailUrl(id), poster, type, text("remarks"))
     }
 
-    private fun searchResult(title: String, href: String, poster: String?, type: TvType): SearchResponse =
+    /** [remark] is the card's own label ("HD中字", "TC", "更新至10集"); only real quality labels become a badge. */
+    private fun searchResult(title: String, href: String, poster: String?, type: TvType, remark: String? = null): SearchResponse =
         if (type == TvType.Movie) {
-            newMovieSearchResponse(title, href, type) { posterUrl = poster }
+            newMovieSearchResponse(title, href, type) { posterUrl = poster; quality = CsQuality.from(remark) }
         } else {
-            newTvSeriesSearchResponse(title, href, type) { posterUrl = poster }
+            newTvSeriesSearchResponse(title, href, type) { posterUrl = poster; quality = CsQuality.from(remark) }
         }
 
     companion object {

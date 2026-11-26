@@ -1,6 +1,7 @@
 package com.haotv
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsQuality
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -118,7 +119,10 @@ class HaotvProvider : MainAPI() {
             if (item.path("type_is_vip_exclusive").asInt(0) == 1) return@mapNotNull null
             val id = item.path("id").asText("").ifBlank { return@mapNotNull null }
             val title = item.path("name").asText("").trim().ifBlank { return@mapNotNull null }
-            searchResult(title, detailUrl(id), image(item.path("pic").asText("")), typeOfCategory(item.path("type_id_1").asInt(0)))
+            searchResult(
+                title, detailUrl(id), image(item.path("pic").asText("")),
+                typeOfCategory(item.path("type_id_1").asInt(0)), item.path("remarks").asText(""),
+            )
         }.distinctBy { it.url }
         val total = vod?.path("total")?.asInt(0) ?: 0
         return results to (list.isNotEmpty() && page * SEARCH_LIMIT < total)
@@ -597,6 +601,7 @@ class HaotvProvider : MainAPI() {
         return searchResult(
             title, detailUrl(id), image(row.path("vod_pic").asText("")),
             type ?: typeOfCategory(row.path("type_id_1").asInt(0)),
+            row.path("vod_remarks").asText(""),
         )
     }
 
@@ -616,11 +621,12 @@ class HaotvProvider : MainAPI() {
         return searchResult(title, fixUrl(link.attr("href")), image(link.attr("data-original").ifBlank { link.attr("src") }), type)
     }
 
-    private fun searchResult(title: String, href: String, poster: String?, type: TvType): SearchResponse =
+    /** [remark] is the card's own label ("HD中字", "TC", "更新至10集"); only real quality labels become a badge. */
+    private fun searchResult(title: String, href: String, poster: String?, type: TvType, remark: String? = null): SearchResponse =
         if (type == TvType.Movie) {
-            newMovieSearchResponse(title, href, type) { posterUrl = poster }
+            newMovieSearchResponse(title, href, type) { posterUrl = poster; quality = CsQuality.from(remark) }
         } else {
-            newTvSeriesSearchResponse(title, href, type) { posterUrl = poster }
+            newTvSeriesSearchResponse(title, href, type) { posterUrl = poster; quality = CsQuality.from(remark) }
         }
 
     companion object {

@@ -1,6 +1,7 @@
 package com.xiaobao
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsQuality
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -110,7 +111,8 @@ class XiaobaoProvider : MainAPI() {
             if (title.isBlank()) return@mapNotNull null
             val categoryText = item.select("p").firstOrNull { it.text().contains("分类：") }
                 ?.text()?.substringAfter("分类：")?.substringBefore("地区")?.trim().orEmpty()
-            ListItem(title, fixUrl(href), imageOf(link)).toSearchResponse(typeForCategoryName(categoryText))
+            ListItem(title, fixUrl(href), imageOf(link), item.selectFirst(".pic-text")?.text()?.trim())
+                .toSearchResponse(typeForCategoryName(categoryText))
         }.distinctBy { it.url }
         val (current, last) = pageInfo(document)
         return results to (current < last && results.isNotEmpty())
@@ -410,7 +412,7 @@ class XiaobaoProvider : MainAPI() {
         else -> TvType.TvSeries
     }
 
-    private data class ListItem(val title: String, val url: String, val poster: String?)
+    private data class ListItem(val title: String, val url: String, val poster: String?, val remark: String? = null)
 
     private fun listItems(root: Element): List<ListItem> =
         root.select(".myui-vodlist__box").mapNotNull { box ->
@@ -419,14 +421,14 @@ class XiaobaoProvider : MainAPI() {
             val title = link.attr("title").trim()
                 .ifBlank { box.selectFirst(".title a")?.text()?.trim().orEmpty() }
             if (title.isBlank()) return@mapNotNull null
-            ListItem(title, fixUrl(href), imageOf(link))
+            ListItem(title, fixUrl(href), imageOf(link), box.selectFirst(".pic-text")?.text()?.trim())
         }.distinctBy { it.url }
 
     private fun ListItem.toSearchResponse(type: TvType): SearchResponse =
         if (type == TvType.Movie) {
-            newMovieSearchResponse(title, url, type) { posterUrl = poster }
+            newMovieSearchResponse(title, url, type) { posterUrl = poster; quality = CsQuality.from(remark) }
         } else {
-            newTvSeriesSearchResponse(title, url, type) { posterUrl = poster }
+            newTvSeriesSearchResponse(title, url, type) { posterUrl = poster; quality = CsQuality.from(remark) }
         }
 
     /** Posters are lazy-loaded through `data-original`; external ones end with a `#err` marker. */

@@ -1,6 +1,7 @@
 package com.olevod
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsQuality
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
@@ -213,12 +214,12 @@ class OlevodProvider : MainAPI() {
         return if (type == TvType.Movie) {
             newMovieSearchResponse(name, loadUrl, type) {
                 posterUrl = poster(picThumb.ifBlank { pic })
-                quality = getQualityFromString(version.ifBlank { remarks })
+                quality = CsQuality.from(version.ifBlank { remarks })
             }
         } else {
             newTvSeriesSearchResponse(name, loadUrl, type) {
                 posterUrl = poster(picThumb.ifBlank { pic })
-                quality = getQualityFromString(version.ifBlank { remarks })
+                quality = CsQuality.from(version.ifBlank { remarks })
             }
         }
     }

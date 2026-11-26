@@ -1,6 +1,7 @@
 package com.duboku
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsQuality
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -162,7 +163,8 @@ class DubokuProvider : MainAPI() {
             if (title.isBlank()) return@mapNotNull null
             val categoryText = item.select("p").firstOrNull { it.text().contains("分类：") }
                 ?.text()?.substringAfter("分类：")?.substringBefore("地区")?.trim().orEmpty()
-            ListItem(title, href, imageOf(link)).toSearchResponse(typeForCategoryName(categoryText))
+            ListItem(title, href, imageOf(link), link.selectFirst(".pic-text")?.text()?.trim())
+                .toSearchResponse(typeForCategoryName(categoryText))
         }
         val (current, last) = pageInfo(document)
         return results.distinctBy { it.url } to (current < last)
@@ -479,9 +481,9 @@ class DubokuProvider : MainAPI() {
 
     private fun ListItem.toSearchResponse(type: TvType): SearchResponse =
         if (type == TvType.Movie) {
-            newMovieSearchResponse(title, url, type) { posterUrl = poster }
+            newMovieSearchResponse(title, url, type) { posterUrl = poster; quality = CsQuality.from(remark) }
         } else {
-            newTvSeriesSearchResponse(title, url, type) { posterUrl = poster }
+            newTvSeriesSearchResponse(title, url, type) { posterUrl = poster; quality = CsQuality.from(remark) }
         }
 
     private fun imageOf(element: Element?): String? {

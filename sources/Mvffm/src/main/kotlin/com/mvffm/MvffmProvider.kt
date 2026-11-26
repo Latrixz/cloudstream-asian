@@ -1,6 +1,7 @@
 package com.mvffm
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsQuality
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -382,7 +383,9 @@ class MvffmProvider : MainAPI() {
         if (title.isBlank()) return null
         val poster = imageOf(selectFirst(".poster img"))
         val typeText = selectFirst(".dramaleixing")?.text().orEmpty()
-        return searchResult(title, href, poster, typeOf(href, typeText))
+        // Movie cards carry a quality tag (".mepo .quality": "HD", "TC中字", "HC中字"); drama cards don't.
+        val quality = CsQuality.from(selectFirst(".mepo .quality")?.text())
+        return searchResult(title, href, poster, typeOf(href, typeText), quality)
     }
 
     private fun Element.toRelatedResult(): SearchResponse? {
@@ -396,10 +399,16 @@ class MvffmProvider : MainAPI() {
         return searchResult(title, href, imageOf(img), typeOf(href, ""))
     }
 
-    private fun searchResult(title: String, href: String, poster: String?, type: TvType): SearchResponse =
+    private fun searchResult(
+        title: String,
+        href: String,
+        poster: String?,
+        type: TvType,
+        quality: SearchQuality? = null,
+    ): SearchResponse =
         if (type == TvType.Movie) {
-            newMovieSearchResponse(title, href, type) { posterUrl = poster }
+            newMovieSearchResponse(title, href, type) { posterUrl = poster; this.quality = quality }
         } else {
-            newTvSeriesSearchResponse(title, href, type) { posterUrl = poster }
+            newTvSeriesSearchResponse(title, href, type) { posterUrl = poster; this.quality = quality }
         }
 }

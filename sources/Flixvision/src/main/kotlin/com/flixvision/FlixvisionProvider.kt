@@ -1,6 +1,7 @@
 package com.flixvision
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsQuality
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -579,7 +580,7 @@ class FlixvisionProvider : MainAPI() {
             .replace(Regex("""\s+-\s+Season\s+\d+$"""), "")
             .trim()
         val poster = imageOf(selectFirst("img"))
-        val quality = selectFirst(".bf-card__qual")?.text()?.let { getQualityFromString(it) }
+        val quality = CsQuality.from(selectFirst(".bf-card__qual")?.text())
         return if (slugOf(url).startsWith("tv-")) {
             newTvSeriesSearchResponse(title, url, TvType.TvSeries) {
                 posterUrl = poster

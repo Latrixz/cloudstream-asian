@@ -1,6 +1,7 @@
 package com.huavod
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsQuality
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -102,7 +103,7 @@ class HuavodProvider : MainAPI() {
                 ?: box.selectFirst("a[href*=/voddetail/]") ?: return@mapNotNull null
             val title = link.text().trim().ifBlank { return@mapNotNull null }
             val remark = box.selectFirst(".public-list-prb")?.text()?.trim().orEmpty()
-            searchResult(title, fixUrl(link.attr("href")), imageOf(box.selectFirst("img")), guessType(remark))
+            searchResult(title, fixUrl(link.attr("href")), imageOf(box.selectFirst("img")), guessType(remark), CsQuality.from(remark))
         }.distinctBy { it.url }
         val pages = Regex("""当前(\d+)/(\d+)页""").find(document.select(".page-tip").text())
         val lastPage = pages?.groupValues?.get(2)?.toIntOrNull() ?: page
@@ -404,14 +405,22 @@ class HuavodProvider : MainAPI() {
         val title = link.attr("title").trim()
             .ifBlank { selectFirst(".time-title")?.text()?.trim().orEmpty() }
             .ifBlank { return null }
-        return searchResult(title, fixUrl(link.attr("href")), imageOf(link.selectFirst("img")), type)
+        // Card remark is usually episode status ("已完结", "第7集"); only real labels ("高清", "抢先版", "1080P集全") map.
+        val quality = CsQuality.from(link.selectFirst(".public-list-prb")?.text())
+        return searchResult(title, fixUrl(link.attr("href")), imageOf(link.selectFirst("img")), type, quality)
     }
 
-    private fun searchResult(title: String, href: String, poster: String?, type: TvType): SearchResponse =
+    private fun searchResult(
+        title: String,
+        href: String,
+        poster: String?,
+        type: TvType,
+        quality: SearchQuality? = null,
+    ): SearchResponse =
         if (type == TvType.Movie) {
-            newMovieSearchResponse(title, href, type) { posterUrl = poster }
+            newMovieSearchResponse(title, href, type) { posterUrl = poster; this.quality = quality }
         } else {
-            newTvSeriesSearchResponse(title, href, type) { posterUrl = poster }
+            newTvSeriesSearchResponse(title, href, type) { posterUrl = poster; this.quality = quality }
         }
 
     companion object {

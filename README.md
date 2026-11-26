@@ -61,6 +61,12 @@ If these sources are useful to you, you can support their upkeep:
 | Rivestream | rivestream.app | English (movies, TV, K-drama, anime) |
 | Rivo | rivo.st | English |
 | Movy | movy.sx | English |
+| OneTouchTV (OneTouchTV Asia) | onetouchtv.xyz | English (Asian dramas, 20+ subtitle languages) |
+| Kisskh (Kisskh Asia) | kisskh.co | English (Asian dramas, movies, anime) |
+| Donghuastream (Donghuastream CS) | donghuastream.org | Chinese animation (donghua) |
+| AniKoto (AniKoto CS) | anikototv.bz | Anime (sub and dub) |
+| AnimeSuge (AnimeSuge CS) | animesuge.cz | Anime (sub and dub) |
+| FourKHDHub (4KHDHub CS) | 4khdhub.one | English, Hindi, Korean movies and series |
 | LiveTv (直播 Live TV) | iptv-org.github.io | Live TV (free channels) |
 | AsianHome (CS Asian 首页) | — | Combined home screen and search across your sources |
 

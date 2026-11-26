@@ -36,7 +36,8 @@ object CsLogos {
         "CS Asian 首页", "直播 Live TV", "华人影院 Huarw", "泥巴影院 Nbyy", "华视界 Haotv", "华视影院 Huavod",
         "随便看 Suikan", "爱瓜TV Aigua", "低端影视 ddys", "独播库 Duboku", "冷映 Len", "酷播 Kubb",
         "小宝影院 Xiaobao", "欧乐影院 Olevod", "Movieffm", "Movy", "Crackle", "Kissasian", "frameXTV",
-        "FlixVision", "Rivestream", "Rivo",
+        "FlixVision", "Rivestream", "Rivo", "OneTouchTV Asia", "Kisskh Asia", "Donghuastream CS",
+        "AniKoto CS", "AnimeSuge CS", "4KHDHub CS",
     )
 
     private const val TARGET_PX = 128
