@@ -9,5 +9,7 @@ class KissasianPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(KissasianProvider())
         com.csasian.shared.CsSupport.maybeShow()
+        // The ⚙ button next to this home source opens the source switcher.
+        openSettings = { ctx -> com.csasian.shared.CsSwitcher.show(ctx) }
     }
 }

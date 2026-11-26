@@ -4,8 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       message:
-        description: "Message to post on @csasian"
+        description: "Message to post on @csasian (the caption when a photo is given)"
         required: true
+      photo:
+        description: "Optional: repo path of an image to post with it, e.g. screenshots/AsianHome/switcher-1.jpg"
+        required: false
+        default: ""
 permissions: {}
 jobs:
   announce:
@@ -15,7 +19,15 @@ jobs:
         env:
           TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           MESSAGE: ${{ github.event.inputs.message }}
+          PHOTO: ${{ github.event.inputs.photo }}
         run: |
+          if [ -n "$PHOTO" ]; then
+            curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendPhoto" \
+              --data-urlencode "chat_id=@csasian" \
+              --data-urlencode "photo=https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/${PHOTO}" \
+              --data-urlencode "caption=${MESSAGE}" | python3 -c "import json,sys;d=json.load(sys.stdin);print('ok:',d.get('ok'),d.get('description',''))"
+            exit 0
+          fi
           curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
             --data-urlencode "chat_id=@csasian" \
             --data-urlencode "text=${MESSAGE}" \

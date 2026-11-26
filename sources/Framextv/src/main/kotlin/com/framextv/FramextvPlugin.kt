@@ -9,5 +9,7 @@ class FramextvPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(FramextvProvider())
         com.csasian.shared.CsSupport.maybeShow()
+        // The ⚙ button next to this home source opens the source switcher.
+        openSettings = { ctx -> com.csasian.shared.CsSwitcher.show(ctx) }
     }
 }

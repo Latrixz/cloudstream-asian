@@ -140,6 +140,11 @@ class AsianHomeSettings(
                 clearAll()
             }
         }
+        // Leaves these settings (unsaved changes are dropped) for the shared home-source switcher.
+        bar.addView(pillButton("切换片源 Switch source", primary = false) {
+            dialog.dismiss()
+            com.csasian.shared.CsSwitcher.show(context)
+        })
         bar.addView(pillButton("片源状态 Status", primary = false) { AsianHomeStatus(context, selfName).show() })
         bar.addView(clearButton)
         bar.addView(pillButton("取消 Cancel", primary = false) { dialog.dismiss() })

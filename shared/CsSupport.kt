@@ -59,6 +59,8 @@ object CsSupport {
 
     /** Call from Plugin.load. Shows the popup a few seconds later if it's due. */
     fun maybeShow() {
+        // Every plugin calls this at load: also hand the ⚙ switcher to other repos' sources.
+        try { CsSwitcher.injectEverywhere() } catch (_: Throwable) { }
         Handler(Looper.getMainLooper()).postDelayed({ checkAndShow() }, 6_000)
     }
 
