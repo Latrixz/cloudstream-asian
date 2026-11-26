@@ -1,0 +1,10 @@
+name = "csasian-support"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+GOAL_USD = "100"
+
+[[kv_namespaces]]
+binding = "SUPPORT"
+id = "5462dcbd5bbc451ca1b81501d4a6938c"

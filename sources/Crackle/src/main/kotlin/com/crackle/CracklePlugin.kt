@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class CracklePlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(CrackleProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

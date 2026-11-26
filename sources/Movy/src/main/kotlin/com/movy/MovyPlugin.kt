@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class MovyPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(MovyProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

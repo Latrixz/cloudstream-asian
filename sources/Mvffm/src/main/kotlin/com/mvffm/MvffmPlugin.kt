@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class MvffmPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(MvffmProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

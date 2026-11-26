@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class LiveTvPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(LiveTvProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

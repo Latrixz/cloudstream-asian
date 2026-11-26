@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class OlevodPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(OlevodProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

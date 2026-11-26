@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class KubbPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(KubbProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

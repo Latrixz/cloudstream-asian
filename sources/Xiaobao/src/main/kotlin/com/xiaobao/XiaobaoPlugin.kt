@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class XiaobaoPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(XiaobaoProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

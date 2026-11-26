@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class KissasianPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(KissasianProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

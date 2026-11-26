@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class FramextvPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(FramextvProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

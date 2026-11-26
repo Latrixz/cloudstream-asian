@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class RivoPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(RivoProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

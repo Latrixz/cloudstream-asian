@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class DdysPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(DdysProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

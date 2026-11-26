@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class HuavodPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(HuavodProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

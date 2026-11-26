@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class FlixvisionPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(FlixvisionProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

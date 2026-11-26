@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class LenPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(LenProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

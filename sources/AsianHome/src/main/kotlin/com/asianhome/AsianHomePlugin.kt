@@ -20,6 +20,7 @@ class AsianHomePlugin : Plugin() {
         }
         provider = AsianHomeProvider(store, open)
         registerMainAPI(provider)
+        com.csasian.shared.CsSupport.maybeShow()
         openSettings = open
     }
 

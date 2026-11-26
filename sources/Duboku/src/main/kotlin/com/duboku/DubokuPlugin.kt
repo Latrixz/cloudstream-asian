@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class DubokuPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(DubokuProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }

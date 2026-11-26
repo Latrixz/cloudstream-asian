@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class RivestreamPlugin : Plugin() {
     override fun load(context: Context) {
         registerMainAPI(RivestreamProvider())
+        com.csasian.shared.CsSupport.maybeShow()
     }
 }
