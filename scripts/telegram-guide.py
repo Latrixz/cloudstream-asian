@@ -27,6 +27,7 @@ NAMES = {
     "Ddys": "Ddys", "Duboku": "Duboku", "Xiaobao": "Xiaobao", "Kissasian": "Kissasian",
     "Crackle": "Crackle", "Flixvision": "FlixVision", "Framextv": "FrameXTV",
     "Rivestream": "Rivestream", "Rivo": "Rivo", "Movy": "Movy",
+    "Huarw": "华人影院 Huarw", "Nbyy": "泥巴影院 Nbyy", "Haotv": "华视界 Haotv", "Suikan": "随便看 Suikan", "Aigua": "爱瓜TV Aigua",
     "LiveTv": "直播 Live TV", "AsianHome": "CS Asian 首页",
 }
 ASIAN_DRAMA_EN = {"Kissasian"}

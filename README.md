@@ -49,6 +49,11 @@ If these sources are useful to you, you can support their upkeep:
 | Ddys | ddys.io | Chinese |
 | Duboku | dbku.tv | Chinese |
 | Xiaobao | xiaobaotv.com | Chinese |
+| Huarw (华人影院) | huarw.com | Chinese |
+| Nbyy (泥巴影院) | nbyy.cc | Chinese |
+| Haotv (华视界) | haotv.app | Chinese |
+| Suikan (随便看) | suikan365.vip | Chinese |
+| Aigua (爱瓜TV) | aigua9.com | Chinese |
 | Kissasian | kissasian.ng | English (Asian dramas) |
 | Crackle | crackle.beauty | English |
 | Flixvision | flixvision.st | English |

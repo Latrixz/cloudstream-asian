@@ -35,9 +35,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 object CsBackup {
     /** Our sources, by the name each one shows in CloudStream. */
     private val OURS = setOf(
-        "欧乐影院 Olevod", "酷播 Kubb", "Movieffm", "冷映 Len", "华视影院 Huavod", "低端影视 ddys",
+        "欧乐影院 Olevod", "酷播 Kubb", "Movieffm", "冷映 Len", "华视影院 Huavod", "华人影院 Huarw", "泥巴影院 Nbyy", "华视界 Haotv", "随便看 Suikan", "爱瓜TV Aigua", "低端影视 ddys",
         "独播库 Duboku", "小宝影院 Xiaobao", "Kissasian", "Crackle", "FlixVision", "frameXTV", "Rivestream", "Rivo", "Movy",
     )
+    /** Sources whose links only play through their own video interceptor (e.g. Haotv decrypts and
+     *  cleans its segments): never offered as backups under another source. */
+    private val NOT_AS_BACKUP = setOf("华视界 Haotv")
     private const val MARKER = "csasian-backup"
     const val ENABLED_KEY = "csasian_backup_links"
 
@@ -140,7 +143,7 @@ object CsBackup {
     ): Boolean {
         val others = try {
             APIHolder.allProviders.toList()
-                .filter { it.name in OURS && it.name != self.name && it.lang == self.lang }
+                .filter { it.name in OURS && it.name !in NOT_AS_BACKUP && it.name != self.name && it.lang == self.lang }
                 .distinctBy { it.name }
         } catch (_: Throwable) {
             emptyList()
@@ -179,9 +182,11 @@ object CsBackup {
             val label = "备用 ${api.name}"
             synchronized(links) { links.toList() }.forEach { l ->
                 callback(
-                    newExtractorLink(label, "$label · ${l.name.removePrefix(api.name).trim().ifEmpty { l.name }}", l.url, l.type) {
+                    newExtractorLink(label, "$label · ${l.name.removePrefix(api.name).trim().ifEmpty { l.name }}" + qualityTag(l.quality), l.url, l.type) {
                         referer = l.referer
-                        quality = l.quality
+                        // Backups never outrank the source's own links (CloudStream plays the
+                        // highest quality first); they're for when those fail.
+                        quality = com.lagradost.cloudstream3.utils.Qualities.P144.value
                         headers = l.headers
                         extractorData = l.extractorData
                     }
@@ -191,6 +196,10 @@ object CsBackup {
         }
         return false
     }
+
+    /** " 1080p" for a known quality (the link itself is ranked last, see linksFrom). */
+    private fun qualityTag(q: Int): String =
+        if (q in 144..4320 && q != com.lagradost.cloudstream3.utils.Qualities.Unknown.value) " ${q}p" else ""
 
     private suspend fun search(api: MainAPI, query: String): List<SearchResponse> = try {
         api.search(query).orEmpty()

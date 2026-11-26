@@ -1,5 +1,5 @@
 // Use an integer for version numbers
-version = 4
+version = 5
 
 cloudstream {
     iconUrl = "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/code/branding/icons/Duboku.png"
