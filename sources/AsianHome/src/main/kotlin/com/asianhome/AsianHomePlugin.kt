@@ -23,7 +23,8 @@ class AsianHomePlugin : Plugin() {
         com.csasian.shared.CsSupport.maybeShow()
         // The ⚙ next to "CS Asian 首页" opens the source switcher like on every CS Asian source;
         // its "Edit home rows" button opens this plugin's own row settings.
-        openSettings = { ctx -> com.csasian.shared.CsSwitcher.show(ctx, "✏️ 编辑首页栏目 Edit home rows" to open) }
+        // SkyStream: ⚙ opens the row editor directly (the switcher can't change its home source).
+        openSettings = if (com.csasian.shared.CsLogos.onSkyStream) open else { ctx -> com.csasian.shared.CsSwitcher.show(ctx, "✏️ 编辑首页栏目 Edit home rows" to open) }
     }
 
     /** Asks the app to rebuild the home screen, which reads the provider's mainPage again. */

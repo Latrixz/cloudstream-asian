@@ -1,7 +1,6 @@
 package com.kubb
 
 import com.csasian.shared.CsBackup
-import com.csasian.shared.CsQuality
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
@@ -336,7 +335,9 @@ class KubbProvider : MainAPI() {
     private fun ListItem.toSearchResponse(): SearchResponse {
         val loadUrl = "$mainUrl/play/$key"
         val type = typeFor(videoClassID)
-        val itemQuality = CsQuality.from(vipResource)
+        // No badge: vipResource is the PAID version's quality (e.g. 4K) while we play the free
+        // version (often 480p), so showing it would promise a quality viewers don't get.
+        val itemQuality: com.lagradost.cloudstream3.SearchQuality? = null
         return if (type == TvType.Movie) {
             newMovieSearchResponse(title, loadUrl, type) {
                 posterUrl = image.ifBlank { null }

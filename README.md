@@ -54,6 +54,19 @@ If these sources are useful to you, you can support their upkeep:
 | Haotv (华视界) | haotv.app | Chinese |
 | Suikan (随便看) | suikan365.vip | Chinese |
 | Aigua (爱瓜TV) | aigua9.com | Chinese |
+| Trjvod (唐人街) | trjvod.com | Chinese |
+| Csxyy (CN影院) | csxyy.com | Chinese (spliced ads removed) |
+| Qwfilm (七味网) | qwfilm.com | Chinese |
+| Kpkuang (看片狂人) | kpkuang.us | Chinese |
+| Nangua (南瓜影视) | nangua1.tv | Chinese (incl. short dramas) |
+| Ncat (网飞猫) | ncat30.com | Chinese |
+| Kkys (可可影视) | kkys14.com | Chinese |
+| Netflixgc (奈飞工厂) | netflixgc.com | Chinese (Netflix and Western titles) |
+| Kankanya (看看鸭) | kankanya.me | Chinese |
+| Gqc (共青春影院) | gqc7.top | Chinese |
+| Darkvod (黑夜影院) | darkvod.com | Chinese |
+| Mujizy (母鸡资源) | mujiziyuan.com | Chinese |
+| Cilixiong (磁力熊) | cilixiong.org | Chinese (top-rated movies and series, with magnet links) |
 | Kissasian | kissasian.ng | English (Asian dramas) |
 | Crackle | crackle.beauty | English |
 | Flixvision | flixvision.st | English |

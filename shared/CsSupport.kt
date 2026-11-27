@@ -64,11 +64,28 @@ object CsSupport {
         Handler(Looper.getMainLooper()).postDelayed({ checkAndShow() }, 6_000)
     }
 
+    /**
+     * The saved "next show" time. CloudStream reads it back as a Long; SkyStream's desktop engine
+     * stores values as text (e.g. "s:1796…"), so fall back to reading the digits out of a String.
+     */
+    private fun readNext(): Long? {
+        try {
+            CloudStreamApp.getKeyClass(KEY_NEXT, java.lang.Long::class.java)?.toLong()?.let { return it }
+        } catch (_: Throwable) {
+        }
+        return try {
+            CloudStreamApp.getKeyClass(KEY_NEXT, String::class.java)
+                ?.let { Regex("-?\\d+").find(it)?.value?.toLongOrNull() }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
     private fun checkAndShow() {
         try {
             // Main thread: every plugin's copy runs here one after the other, so the key decides once.
             val now = System.currentTimeMillis()
-            val next = CloudStreamApp.getKeyClass(KEY_NEXT, java.lang.Long::class.java)?.toLong()
+            val next = readNext()
             // First use (never shown, or a test build's marker): show now.
             // Test builds: once per app run (the run is marked with the process id).
             val runMark = -android.os.Process.myPid().toLong()

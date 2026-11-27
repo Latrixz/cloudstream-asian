@@ -10,6 +10,7 @@ class MvffmPlugin : Plugin() {
         registerMainAPI(MvffmProvider())
         com.csasian.shared.CsSupport.maybeShow()
         // The ⚙ button next to this home source opens the source switcher.
-        openSettings = { ctx -> com.csasian.shared.CsSwitcher.show(ctx) }
+        // SkyStream (desktop) can't switch its home source from a plugin, so no ⚙ there.
+        if (!com.csasian.shared.CsLogos.onSkyStream) openSettings = { ctx -> com.csasian.shared.CsSwitcher.show(ctx) }
     }
 }

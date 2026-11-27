@@ -30,6 +30,7 @@ NAMES = {
     "Huarw": "华人影院 Huarw", "Nbyy": "泥巴影院 Nbyy", "Haotv": "华视界 Haotv", "Suikan": "随便看 Suikan", "Aigua": "爱瓜TV Aigua",
     "OneTouchTV": "OneTouchTV Asia", "Kisskh": "Kisskh Asia", "Donghuastream": "Donghuastream CS",
     "AniKoto": "AniKoto CS", "AnimeSuge": "AnimeSuge CS", "FourKHDHub": "4KHDHub CS",
+    "Trjvod": "唐人街 Trjvod", "Csxyy": "CN影院 Csxyy", "Qwfilm": "七味网 Qwfilm", "Kpkuang": "看片狂人 Kpkuang", "Nangua": "南瓜影视 Nangua", "Ncat": "网飞猫 Ncat", "Kkys": "可可影视 Kkys", "Netflixgc": "奈飞工厂 Netflixgc", "Kankanya": "看看鸭 Kankanya", "Gqc": "共青春影院 Gqc", "Darkvod": "黑夜影院 Darkvod", "Mujizy": "母鸡资源 Mujizy", "Cilixiong": "磁力熊 Cilixiong",
     "LiveTv": "直播 Live TV", "AsianHome": "CS Asian 首页",
 }
 ASIAN_DRAMA_EN = {"Kissasian", "OneTouchTV", "Kisskh"}

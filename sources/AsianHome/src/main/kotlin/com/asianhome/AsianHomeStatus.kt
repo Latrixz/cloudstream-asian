@@ -286,6 +286,10 @@ class AsianHomeStatus(private val context: Context, selfName: String) {
     private fun bindLogo(view: LogoView, api: MainAPI) {
         scope.launch {
             val urls = AsianHomeLogos.candidates(api)
+            if (com.csasian.shared.CsLogos.onSkyStream) {
+                com.csasian.shared.CsLogos.firstImageUrl(urls)?.let { view.showUrl(it) }
+                return@launch
+            }
             urls.firstNotNullOfOrNull { AsianHomeLogos.cached(it) }?.let {
                 view.show(it, animate = false)
                 return@launch

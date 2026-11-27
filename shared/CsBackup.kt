@@ -35,12 +35,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 object CsBackup {
     /** Our sources, by the name each one shows in CloudStream. */
     private val OURS = setOf(
-        "欧乐影院 Olevod", "酷播 Kubb", "Movieffm", "冷映 Len", "华视影院 Huavod", "华人影院 Huarw", "泥巴影院 Nbyy", "华视界 Haotv", "随便看 Suikan", "爱瓜TV Aigua", "低端影视 ddys",
+        "欧乐影院 Olevod", "酷播 Kubb", "Movieffm", "冷映 Len", "华视影院 Huavod", "华人影院 Huarw", "CN影院 Csxyy", "泥巴影院 Nbyy", "唐人街 Trjvod", "优视频 UVOD", "华视界 Haotv", "随便看 Suikan", "爱瓜TV Aigua", "低端影视 ddys", "七味网 Qwfilm", "南瓜影视 Nangua", "网飞猫 Ncat", "看看鸭 Kankanya", "看片狂人 Kpkuang", "可可影视 Kkys", "母鸡资源 Mujizy", "磁力熊 Cilixiong", "奈飞工厂 Netflixgc", "共青春影院 Gqc", "黑夜影院 Darkvod",
         "独播库 Duboku", "小宝影院 Xiaobao", "Kissasian", "Crackle", "FlixVision", "frameXTV", "Rivestream", "Rivo", "Movy", "OneTouchTV Asia", "Kisskh Asia", "Donghuastream CS", "4KHDHub CS", "AniKoto CS", "AnimeSuge CS",
     )
     /** Sources whose links only play through their own video interceptor (e.g. Haotv decrypts and
      *  cleans its segments): never offered as backups under another source. */
-    private val NOT_AS_BACKUP = setOf("华视界 Haotv")
+    private val NOT_AS_BACKUP = setOf("华视界 Haotv", "看看鸭 Kankanya")
     private const val MARKER = "csasian-backup"
     const val ENABLED_KEY = "csasian_backup_links"
 

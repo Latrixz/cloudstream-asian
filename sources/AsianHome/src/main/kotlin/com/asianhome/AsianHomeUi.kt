@@ -127,6 +127,15 @@ class LogoView(context: Context, private val label: String, sizePx: Int, private
         layoutParams = ViewGroup.LayoutParams(sizePx, sizePx)
     }
 
+    /** SkyStream: the host app loads the image itself from the URL. */
+    fun showUrl(url: String) {
+        background = Ui.rounded(Color.parseColor("#F4F2FF"), radius)
+        letter.visibility = View.GONE
+        image.setImageURI(android.net.Uri.parse(url))
+        image.visibility = View.VISIBLE
+        image.alpha = 1f
+    }
+
     fun show(bitmap: Bitmap, animate: Boolean) {
         background = Ui.rounded(Color.parseColor("#F4F2FF"), radius)
         letter.visibility = View.GONE

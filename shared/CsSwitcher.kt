@@ -72,6 +72,11 @@ object CsSwitcher {
 
     private const val HOOK_KEY = "csasian.switcher.hooked"
 
+    private const val SKY_HINT =
+        "SkyStream 不允许插件切换首页片源：请在 SkyStream 首页顶部的片源菜单里选择。想在一个首页看多个片源，就选「CS Asian 首页」，再用 ✏️ 编辑首页栏目。\n" +
+            "SkyStream doesn't let plugins change its home source: pick one from SkyStream's own source menu on Home. " +
+            "To see rows from many sources on one page, pick \"CS Asian 首页\" and use ✏️ Edit home rows."
+
     // Note: plugins built on CloudStream's newer BasePlugin class (e.g. phisher98, CNCVerse) have no
     // settings slot, so the Home ⚙ can't appear for them; only Plugin-based ones get it.
     private fun inject() {
@@ -164,6 +169,7 @@ object CsSwitcher {
                 orientation = LinearLayout.VERTICAL
                 clipChildren = false
             }
+            if (CsLogos.onSkyStream) addSkyStreamNote(body)
             // Our sources first (CS Asian 首页 leading), then everyone else's; each alphabetical.
             val (ours, others) = sources.partition { CsLogos.isOurs(it) }
             val oursSorted = ours.sortedWith(compareBy({ !it.name.startsWith("CS Asian") }, { it.name.lowercase() }))
@@ -214,7 +220,7 @@ object CsSwitcher {
             val titles = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
             titles.addView(text("切换片源 · Switch source", 20f, TEXT, BOLD))
             titles.addView(
-                singleLine(text("选择首页显示的片源 · Pick what Home shows", 12.5f, TEXT_2)),
+                singleLine(text(if (CsLogos.onSkyStream) "SkyStream：请用 SkyStream 的片源菜单切换 · Use SkyStream's source menu" else "选择首页显示的片源 · Pick what Home shows", 12.5f, TEXT_2)),
                 LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(4) },
             )
             bar.addView(titles, LinearLayout.LayoutParams(0, WRAP, 1f).apply { leftMargin = dp(12) })
@@ -322,10 +328,30 @@ object CsSwitcher {
             if (firstCard == null) firstCard = card
 
             card.setOnClickListener {
+                if (CsLogos.onSkyStream) {
+                    // SkyStream keeps its own home source and gives plugins no way to change it.
+                    Toast.makeText(context, SKY_HINT, Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
                 dialog.dismiss()
                 switchTo(context, api)
             }
             return card
+        }
+
+        /** SkyStream: explain how to switch there, and that CS Asian 首页 gathers rows from every source. */
+        private fun addSkyStreamNote(body: LinearLayout) {
+            val note = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                background = rounded(CARD, dpf(14f), dp(1) + 1, OUTLINE)
+                setPadding(dp(16), dp(12), dp(16), dp(12))
+            }
+            note.addView(text("在 SkyStream 里切换片源 · Switching in SkyStream", 15f, TEXT, BOLD))
+            note.addView(
+                text(SKY_HINT, 13f, TEXT_2),
+                LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(6) },
+            )
+            body.addView(note, LinearLayout.LayoutParams(MATCH, WRAP).apply { setMargins(dp(6), dp(8), dp(6), dp(4)) })
         }
 
         // ---- Logos ----
@@ -334,6 +360,10 @@ object CsSwitcher {
             // Once candidates are known, a cached logo shows at once, without the fade.
             scope.launch {
                 val urls = CsLogos.candidates(api)
+                if (CsLogos.onSkyStream) {
+                    CsLogos.firstImageUrl(urls)?.let { view.showUrl(it) }
+                    return@launch
+                }
                 urls.firstNotNullOfOrNull { CsLogos.cached(it) }?.let {
                     view.show(it, animate = false)
                     return@launch
@@ -343,6 +373,10 @@ object CsSwitcher {
         }
 
         private fun bindLogo(view: LogoTile, urls: List<String>) {
+            if (CsLogos.onSkyStream) {
+                scope.launch { CsLogos.firstImageUrl(urls)?.let { view.showUrl(it) } }
+                return
+            }
             urls.firstNotNullOfOrNull { CsLogos.cached(it) }?.let {
                 view.show(it, animate = false)
                 return
@@ -375,6 +409,15 @@ object CsSwitcher {
             val inner = sizePx - 2 * inset
             addView(image, LayoutParams(inner, inner, Gravity.CENTER))
             layoutParams = LinearLayout.LayoutParams(sizePx, sizePx)
+        }
+
+        /** SkyStream: the host app loads the image itself from the URL. */
+        fun showUrl(url: String) {
+            background = rounded(Color.parseColor("#F4F2FF"), radius)
+            letter.visibility = View.GONE
+            image.setImageURI(android.net.Uri.parse(url))
+            image.visibility = View.VISIBLE
+            image.alpha = 1f
         }
 
         fun show(bitmap: Bitmap, animate: Boolean) {

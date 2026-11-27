@@ -141,10 +141,13 @@ class AsianHomeSettings(
             }
         }
         // Leaves these settings (unsaved changes are dropped) for the shared home-source switcher.
-        bar.addView(pillButton("切换片源 Switch source", primary = false) {
-            dialog.dismiss()
-            com.csasian.shared.CsSwitcher.show(context)
-        })
+        // Not on SkyStream: it keeps its own home source and plugins can't change it.
+        if (!com.csasian.shared.CsLogos.onSkyStream) {
+            bar.addView(pillButton("切换片源 Switch source", primary = false) {
+                dialog.dismiss()
+                com.csasian.shared.CsSwitcher.show(context)
+            })
+        }
         bar.addView(pillButton("片源状态 Status", primary = false) { AsianHomeStatus(context, selfName).show() })
         bar.addView(clearButton)
         bar.addView(pillButton("取消 Cancel", primary = false) { dialog.dismiss() })
@@ -548,6 +551,10 @@ class AsianHomeSettings(
         // Once candidates are known, a cached logo shows at once, without the fade.
         scope.launch {
             val urls = AsianHomeLogos.candidates(api)
+            if (com.csasian.shared.CsLogos.onSkyStream) {
+                com.csasian.shared.CsLogos.firstImageUrl(urls)?.let { view.showUrl(it) }
+                return@launch
+            }
             urls.firstNotNullOfOrNull { AsianHomeLogos.cached(it) }?.let {
                 view.show(it, animate = false)
                 return@launch
@@ -557,6 +564,10 @@ class AsianHomeSettings(
     }
 
     private fun bindLogo(view: LogoView, urls: List<String>) {
+        if (com.csasian.shared.CsLogos.onSkyStream) {
+            scope.launch { com.csasian.shared.CsLogos.firstImageUrl(urls)?.let { view.showUrl(it) } }
+            return
+        }
         urls.firstNotNullOfOrNull { AsianHomeLogos.cached(it) }?.let {
             view.show(it, animate = false)
             return

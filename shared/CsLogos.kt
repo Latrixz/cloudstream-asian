@@ -33,7 +33,7 @@ object CsLogos {
 
     /** Fallback when a plugin has no online record (e.g. a test copy installed by hand). */
     private val OUR_NAMES = setOf(
-        "CS Asian 首页", "直播 Live TV", "华人影院 Huarw", "泥巴影院 Nbyy", "华视界 Haotv", "华视影院 Huavod",
+        "CS Asian 首页", "直播 Live TV", "华人影院 Huarw", "CN影院 Csxyy", "泥巴影院 Nbyy", "唐人街 Trjvod", "优视频 UVOD", "华视界 Haotv", "华视影院 Huavod", "七味网 Qwfilm", "南瓜影视 Nangua", "网飞猫 Ncat", "看看鸭 Kankanya", "看片狂人 Kpkuang", "可可影视 Kkys", "母鸡资源 Mujizy", "磁力熊 Cilixiong", "奈飞工厂 Netflixgc", "共青春影院 Gqc", "黑夜影院 Darkvod",
         "随便看 Suikan", "爱瓜TV Aigua", "低端影视 ddys", "独播库 Duboku", "冷映 Len", "酷播 Kubb",
         "小宝影院 Xiaobao", "欧乐影院 Olevod", "Movieffm", "Movy", "Crackle", "Kissasian", "frameXTV",
         "FlixVision", "Rivestream", "Rivo", "OneTouchTV Asia", "Kisskh Asia", "Donghuastream CS",
@@ -70,6 +70,48 @@ object CsLogos {
         val url = pluginOf(api)?.url
         if (!url.isNullOrBlank()) return url.lowercase().contains(REPO_MARKER)
         return api.name in OUR_NAMES
+    }
+
+    // ---- SkyStream (desktop) ----
+
+    /**
+     * True when the plugin runs outside Android, e.g. in SkyStream's desktop engine. There, screens
+     * are redrawn by the host app: images can only be given as a URL (ImageView.setImageURI), and
+     * bitmaps can't be decoded, so logos go by URL instead.
+     */
+    val onSkyStream: Boolean by lazy {
+        val vm = System.getProperty("java.vm.name").orEmpty()
+        !vm.contains("Dalvik", true) && !vm.contains("ART", false)
+    }
+
+    private val goodUrls = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
+    /** The first candidate URL that serves an image (checked by its first bytes), or null. */
+    suspend fun firstImageUrl(urls: List<String>): String? {
+        for (url in urls.distinct()) {
+            val ok = goodUrls[url] ?: try {
+                withTimeoutOrNull(FETCH_TIMEOUT_MS) {
+                    val res = app.get(url)
+                    res.isSuccessful && looksLikeImage(res.body.bytes())
+                } ?: false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                false
+            }.also { goodUrls[url] = it }
+            if (ok) return url
+        }
+        return null
+    }
+
+    private fun looksLikeImage(b: ByteArray): Boolean {
+        if (b.size < 12) return false
+        fun at(i: Int) = b[i].toInt() and 0xff
+        return (at(0) == 0x89 && at(1) == 0x50) || // PNG
+            (at(0) == 0xff && at(1) == 0xd8) || // JPEG
+            (at(0) == 0x47 && at(1) == 0x49) || // GIF
+            (at(0) == 0x52 && at(1) == 0x49 && at(8) == 0x57) || // WEBP
+            (at(0) == 0 && at(1) == 0 && at(2) == 1 && at(3) == 0) // ICO
     }
 
     // ---- Bitmaps ----
