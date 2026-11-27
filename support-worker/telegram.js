@@ -79,6 +79,12 @@ async function update(request, env) {
 
 // Private chat: any message shows the device menu. Groups: only /start, /install or /help.
 async function message(env, m) {
+  // The old channel is linked to the group, so Telegram copies (and pins) its posts here.
+  // Updates are posted in the group directly, so remove those copies.
+  if (m.is_automatic_forward && isOurChat(m.chat, env)) {
+    await api(env, "deleteMessage", { chat_id: m.chat.id, message_id: m.message_id });
+    return;
+  }
   const t = (m.text || "").trim();
   const cmd = /^\/(start|install|help)(@\w+)?\b/i.exec(t)?.[1]?.toLowerCase();
   if (m.chat?.type !== "private" && !cmd) return;

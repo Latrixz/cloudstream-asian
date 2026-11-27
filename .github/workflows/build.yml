@@ -67,6 +67,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT: "@csasian"
+          TELEGRAM_NOTICE_CHAT: "@csasian_news"   # old channel: short "update + we've moved" notice
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
           SCREENSHOTS_DIR: ${{ github.workspace }}/src/screenshots
         run: python3 $GITHUB_WORKSPACE/src/scripts/telegram-notify.py $RUNNER_TEMP/old-plugins.json $GITHUB_WORKSPACE/builds/plugins.json
