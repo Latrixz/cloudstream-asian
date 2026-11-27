@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keep the pinned installation guide on the @csasian Telegram channel up to date.
+"""Keep the pinned installation guide in the @csasian Telegram group up to date.
 
 Usage:
   telegram-guide.py post <plugins.json>   post the guide as a new message and pin it (prints the message id)
@@ -7,8 +7,7 @@ Usage:
   telegram-guide.py show <plugins.json>   just print the guide text
 
 Env: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT (default @csasian), TELEGRAM_GUIDE_MESSAGE_ID (for edit).
-The bot can only edit messages it posted itself, and pinning in a channel needs the
-"Edit messages of others" admin right.
+The bot can only edit messages it posted itself, and pinning needs the "Pin messages" admin right.
 """
 import json
 import os
@@ -81,14 +80,16 @@ def guide(plugins):
         "📌 CloudStream Asian: Installation Guide | 安装教程",
         REPO,
         "",
-        "1️⃣ Install CloudStream | 安装 CloudStream",
-        "Download the official app (Android phone / Android TV / Google TV):",
-        "github.com/recloudstream/cloudstream/releases",
-        "Get the latest .apk (TV boxes are usually armeabi-v7a or arm64).",
-        "请从官方 GitHub 下载最新版 APK 安装。",
+        "1️⃣ Install an app | 安装应用",
+        "Use either one:",
+        "• CloudStream (Android phone / TV): github.com/recloudstream/cloudstream/releases",
+        "• SkyStream (Android, iPhone, Windows, Mac, Linux): github.com/akashdh11/skystream/releases",
+        "Step-by-step help for your device: t.me/CSAsianBot?start=install",
+        "任选一个安装：CloudStream（安卓手机/电视）或 SkyStream（安卓、iPhone、Windows、Mac、Linux）。",
+        "按设备查看安装步骤：t.me/CSAsianBot?start=install",
         "",
         "2️⃣ Add our repository | 添加片源仓库",
-        "CloudStream → Settings → Extensions → Add repository",
+        "Settings → Extensions → Add repository",
         "Type the short code: csasian",
         "设置 → 扩展 → 添加仓库 → 输入 csasian",
         "(If the code doesn't work, paste: " + REPO_JSON + ")",
@@ -108,8 +109,8 @@ def guide(plugins):
         "☕ Support the project | 支持我们",
         SUPPORT,
         "",
-        "❓ A source broken or want a new site? Comment below or message us.",
-        "片源失效或想要新站点？欢迎留言。",
+        "❓ A source broken or want a new site? Ask in this chat or send /help.",
+        "片源失效或想要新站点？在群里提问或发送 /help。",
     ])
 
 

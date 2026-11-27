@@ -6,14 +6,19 @@
  *   GET  /stats   {"month":"November 2026","goal":100,"raised":23,"percent":23,"supporters":7}
  *   POST /admin   {"month":"2026-11","raised":12,"supporters":3}  (Authorization: Bearer ADMIN_TOKEN)
  *
+ *   POST /telegram*  Telegram channel welcome bot, see telegram.js
+ *
  * Secrets: BMC_SECRET, ADMIN_TOKEN. KV binding: SUPPORT. Var: GOAL_USD.
  */
+import { telegram } from "./telegram.js";
+
 const COUNTED = new Set(["donation.created", "membership.started", "extra_purchase.created"]);
 const REFUNDS = new Set(["donation.refunded", "extra_purchase.refunded"]);
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/telegram")) return telegram(request, env, url);
     if (url.pathname === "/stats" && request.method === "GET") return stats(env);
     // The webhook: /bmc (or the bare address, in case it was entered without the path).
     if ((url.pathname === "/bmc" || url.pathname === "/") && request.method === "POST") return webhook(request, env);

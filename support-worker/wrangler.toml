@@ -4,6 +4,10 @@ compatibility_date = "2026-11-01"
 
 [vars]
 GOAL_USD = "100"
+TELEGRAM_CHAT = "@csasian"
+WELCOME_ENABLED = "true"   # bot greets each new member in the @csasian group
+WELCOME_REPLACE = "false"   # "true" deletes the previous welcome when a new one is posted
+TELEGRAM_GUIDE_MESSAGE_ID = "7"   # the pinned guide post in TELEGRAM_CHAT, linked from the welcome
 
 [[kv_namespaces]]
 binding = "SUPPORT"
