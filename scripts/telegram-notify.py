@@ -26,6 +26,7 @@ NAMES = {
     "AniKoto": "AniKoto CS", "AnimeSuge": "AnimeSuge CS", "FourKHDHub": "4KHDHub CS",
     "Trjvod": "唐人街 Trjvod", "Csxyy": "CN影院 Csxyy", "Qwfilm": "七味网 Qwfilm", "Kpkuang": "看片狂人 Kpkuang", "Nangua": "南瓜影视 Nangua", "Ncat": "网飞猫 Ncat", "Kkys": "可可影视 Kkys", "Netflixgc": "奈飞工厂 Netflixgc", "Kankanya": "看看鸭 Kankanya", "Gqc": "共青春影院 Gqc", "Darkvod": "黑夜影院 Darkvod", "Mujizy": "母鸡资源 Mujizy", "Cilixiong": "磁力熊 Cilixiong",
     "Movies321": "321Movies CS", "Cinejoy": "Cinejoy CS", "Dm233": "233动漫 Dm233",
+    "Zxcstream": "ZXCStream CS", "Reelfren": "ReelFren Shorts", "Chartdrama": "ChartDrama Shorts", "Dramatip": "DramaTip Shorts", "Dramafren": "DramaFren",
     "LiveTv": "直播 Live TV", "AsianHome": "CS Asian 首页",
 }
 

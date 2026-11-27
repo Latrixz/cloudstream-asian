@@ -55,7 +55,11 @@ class MovyProvider : MainAPI() {
         "discover/tv?with_networks=453" to "Hulu",
     )
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+    // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
+        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val path = request.data
         val defaultType = when {
             path.startsWith("movie") -> "movie"
@@ -83,7 +87,8 @@ class MovyProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
-    override suspend fun load(url: String): LoadResponse = loadPage(url).also { CsBackup.remember(this, it) }
+    override suspend fun load(url: String): LoadResponse =
+        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,

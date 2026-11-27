@@ -83,6 +83,11 @@ If these sources are useful to you, you can support their upkeep:
 | Movies321 (321Movies CS) | 321movies.xyz | English (movies, TV, K-drama, anime; plays in CloudStream) |
 | Cinejoy (Cinejoy CS) | cinejoy.pk | English (movies and TV, up to 4K HDR) |
 | Dm233 (233动漫 Dm233) | 233dm.com | Chinese-subbed anime (日漫, 国漫, movies, tokusatsu) |
+| Zxcstream (ZXCStream CS) | zxcstream.com | English (movies and TV, up to 4K, dubbed audio) |
+| Reelfren (ReelFren Shorts) | reelfren.net | English short dramas (ReelShort, DramaBox, ShortMax and 40+ apps) |
+| Chartdrama (ChartDrama Shorts) | chartdrama.com | English short dramas (GoodShort, StarShort, DramaTV and 30+ apps) |
+| Dramatip (DramaTip Shorts) | dramatip.net | English short dramas (YourChannel, ShortWave, MyDramaWave and 70+ apps) |
+| Dramafren (DramaFren) | v2.dramafren.org | Chinese short dramas with English subtitles, plus DramaBox |
 | LiveTv (直播 Live TV) | iptv-org.github.io | Live TV (free channels) |
 | AsianHome (CS Asian 首页) | — | Combined home screen and search across your sources |
 

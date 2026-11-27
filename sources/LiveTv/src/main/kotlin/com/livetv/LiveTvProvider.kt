@@ -65,7 +65,11 @@ class LiveTvProvider : MainAPI() {
         "category/documentary" to "纪录 Documentary",
     )
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+    // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
+        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val all = catalog().rows[request.data].orEmpty()
         val from = (page - 1) * PAGE_SIZE
         val items = all.drop(from).take(PAGE_SIZE).map { toCard(it) }
@@ -95,6 +99,7 @@ class LiveTvProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
+        com.csasian.shared.CsMore.load(this, url)?.let { return it }
         val cat = catalog()
         val id = channelId(url) ?: throw ErrorLoadingException("Invalid channel URL: $url")
         val c = cat.channels[id] ?: throw ErrorLoadingException("Channel not found: $id")

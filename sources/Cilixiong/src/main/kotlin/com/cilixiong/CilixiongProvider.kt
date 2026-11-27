@@ -54,7 +54,11 @@ class CilixiongProvider : MainAPI() {
         "2-0-4" to "美剧",
     )
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+    // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
+        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val path = request.data
         val url = when {
             path.endsWith("/") -> if (page <= 1) "$mainUrl/$path" else "$mainUrl/${path}index_$page.html"
