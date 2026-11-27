@@ -33,7 +33,7 @@ object CsLogos {
 
     /** Fallback when a plugin has no online record (e.g. a test copy installed by hand). */
     private val OUR_NAMES = setOf(
-        "CS Asian 首页", "直播 Live TV", "华人影院 Huarw", "CN影院 Csxyy", "泥巴影院 Nbyy", "唐人街 Trjvod", "优视频 UVOD", "华视界 Haotv", "华视影院 Huavod", "七味网 Qwfilm", "南瓜影视 Nangua", "网飞猫 Ncat", "看看鸭 Kankanya", "看片狂人 Kpkuang", "可可影视 Kkys", "母鸡资源 Mujizy", "磁力熊 Cilixiong", "奈飞工厂 Netflixgc", "共青春影院 Gqc", "黑夜影院 Darkvod",
+        "CS Asian 首页", "直播 Live TV", "华人影院 Huarw", "CN影院 Csxyy", "泥巴影院 Nbyy", "唐人街 Trjvod", "优视频 UVOD", "华视界 Haotv", "华视影院 Huavod", "七味网 Qwfilm", "南瓜影视 Nangua", "网飞猫 Ncat", "看看鸭 Kankanya", "看片狂人 Kpkuang", "可可影视 Kkys", "母鸡资源 Mujizy", "磁力熊 Cilixiong", "奈飞工厂 Netflixgc", "共青春影院 Gqc", "黑夜影院 Darkvod", "233动漫 Dm233", "321Movies CS", "Cinejoy CS",
         "随便看 Suikan", "爱瓜TV Aigua", "低端影视 ddys", "独播库 Duboku", "冷映 Len", "酷播 Kubb",
         "小宝影院 Xiaobao", "欧乐影院 Olevod", "Movieffm", "Movy", "Crackle", "Kissasian", "frameXTV",
         "FlixVision", "Rivestream", "Rivo", "OneTouchTV Asia", "Kisskh Asia", "Donghuastream CS",

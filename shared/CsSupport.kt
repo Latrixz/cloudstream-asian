@@ -42,6 +42,20 @@ object CsSupport {
 
     private class Goal(val month: String, val goal: Double, val raised: Double, val percent: Int, val supporters: Int)
 
+    /** The published source list; the popup counts it so the number is always current. */
+    private const val PLUGINS_URL = "https://raw.githubusercontent.com/Latrixz/cloudstream-asian/main/plugins.json"
+
+    /** Number of sources in the repo (CS Asian 首页 is a home screen, not a source); null if unreachable. */
+    private fun fetchSourceCount(): Int? = try {
+        val c = java.net.URL(PLUGINS_URL).openConnection() as java.net.HttpURLConnection
+        c.connectTimeout = 4000
+        c.readTimeout = 4000
+        val arr = org.json.JSONArray(c.inputStream.bufferedReader().use { it.readText() })
+        (0 until arr.length()).count { arr.getJSONObject(it).optString("internalName") != "AsianHome" }.takeIf { it > 0 }
+    } catch (_: Throwable) {
+        null
+    }
+
     /** Reads the goal; null when it can't be reached (the popup then shows without the bar). */
     private fun fetchGoal(): Goal? = try {
         val c = java.net.URL(STATS_URL).openConnection() as java.net.HttpURLConnection
@@ -97,9 +111,10 @@ object CsSupport {
             // Fetch the goal off the main thread, then show.
             Thread {
                 val goal = fetchGoal()
+                val count = fetchSourceCount()
                 Handler(Looper.getMainLooper()).post {
                     val activity = CommonActivity.activity ?: return@post
-                    if (!activity.isFinishing) show(activity, goal)
+                    if (!activity.isFinishing) show(activity, goal, count)
                 }
             }.start()
         } catch (_: Throwable) {
@@ -108,7 +123,7 @@ object CsSupport {
 
     private fun money(v: Double) = if (v % 1.0 == 0.0) v.toLong().toString() else String.format(java.util.Locale.US, "%.2f", v)
 
-    private fun show(activity: Activity, goal: Goal?) {
+    private fun show(activity: Activity, goal: Goal?, sourceCount: Int?) {
         val d = activity.resources.displayMetrics.density
         fun dp(v: Int) = (v * d).toInt()
         fun rounded(color: Int, r: Float, stroke: Int = 0, strokeColor: Int = 0) = GradientDrawable().apply {
@@ -157,7 +172,7 @@ object CsSupport {
             LinearLayout.LayoutParams(textWidth, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(10) })
 
         val tiles = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
-        listOf("🎬" to "17 片源 Sources", "🚫" to "零广告 No ads", "🆓" to "100% 免费 Free").forEachIndexed { i, (icon, label) ->
+        listOf("🎬" to "${sourceCount ?: "40+"} 片源 Sources", "🚫" to "零广告 No ads", "🆓" to "100% 免费 Free").forEachIndexed { i, (icon, label) ->
             val t = LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
                 background = rounded(Color.parseColor("#14FFFFFF"), 12f, dp(1), Color.parseColor("#26FFFFFF"))

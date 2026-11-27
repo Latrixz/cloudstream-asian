@@ -13,7 +13,11 @@ class AsianHomePlugin : Plugin() {
         lateinit var provider: AsianHomeProvider
         val open: (Context) -> Unit = { ctx ->
             try {
-                AsianHomeSettings(ctx, store, provider.name) { reloadHome(ctx) }.show()
+                if (com.csasian.shared.CsLogos.onSkyStream) {
+                    AsianHomeSkySettings(ctx, store, provider.name) { reloadHome(ctx) }.show()
+                } else {
+                    AsianHomeSettings(ctx, store, provider.name) { reloadHome(ctx) }.show()
+                }
             } catch (e: Throwable) {
                 Toast.makeText(ctx, "CS Asian 首页: ${e.message}", Toast.LENGTH_LONG).show()
             }

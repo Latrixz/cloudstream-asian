@@ -80,6 +80,9 @@ If these sources are useful to you, you can support their upkeep:
 | AniKoto (AniKoto CS) | anikototv.bz | Anime (sub and dub) |
 | AnimeSuge (AnimeSuge CS) | animesuge.cz | Anime (sub and dub) |
 | FourKHDHub (4KHDHub CS) | 4khdhub.one | English, Hindi, Korean movies and series |
+| Movies321 (321Movies CS) | 321movies.xyz | English (movies, TV, K-drama, anime; plays in CloudStream) |
+| Cinejoy (Cinejoy CS) | cinejoy.pk | English (movies and TV, up to 4K HDR) |
+| Dm233 (233动漫 Dm233) | 233dm.com | Chinese-subbed anime (日漫, 国漫, movies, tokusatsu) |
 | LiveTv (直播 Live TV) | iptv-org.github.io | Live TV (free channels) |
 | AsianHome (CS Asian 首页) | — | Combined home screen and search across your sources |
 
