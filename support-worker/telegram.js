@@ -19,7 +19,7 @@
  * KV keeps only the current welcome's message id and the bot's username (no user data).
  *
  * Each welcome has a "📲 How to install" button that opens the bot (t.me/<bot>?start=install).
- * Bot commands: /start and /install show the device menu; /help shows how to report problems.
+ * Bot commands: /start and /install show the device menu; /help shows how to report problems. /myid replies with your Telegram ID.
  */
 import { help, menu, platform } from "./install-guide.js";
 
@@ -86,7 +86,15 @@ async function message(env, m) {
     return;
   }
   const t = (m.text || "").trim();
-  const cmd = /^\/(start|install|help)(@\w+)?\b/i.exec(t)?.[1]?.toLowerCase();
+  // /myid: replies with the sender's Telegram ID (and the chat's, in a group). Used to point the
+  // daily source-watcher report (repo variable TELEGRAM_WATCH_CHAT) at a person or chat.
+  if (/^\/myid(@\w+)?\b/i.test(t) && !m.from?.is_bot) {
+    const lines = [`Your ID: <code>${m.from?.id}</code>`];
+    if (m.chat?.type !== "private") lines.push(`This chat's ID: <code>${m.chat?.id}</code>`);
+    await api(env, "sendMessage", { chat_id: m.chat.id, text: lines.join("\n"), parse_mode: "HTML" });
+    return;
+  }
+  const cmd =/^\/(start|install|help)(@\w+)?\b/i.exec(t)?.[1]?.toLowerCase();
   if (m.chat?.type !== "private" && !cmd) return;
   if (m.from?.is_bot) return;
   const view = cmd === "help" ? help() : menu();
