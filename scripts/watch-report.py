@@ -15,6 +15,7 @@ import glob
 import json
 import os
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -133,5 +134,8 @@ if token and chat:
     try:
         with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/sendMessage", body, timeout=30) as res:
             print("Telegram:", json.load(res).get("ok"), file=sys.stderr)
+    except urllib.error.HTTPError as e:
+        # e.g. "chat not found": that person hasn't pressed Start in a private chat with the bot yet.
+        print("Telegram failed:", e, e.read().decode(errors="replace"), file=sys.stderr)
     except Exception as e:
         print("Telegram failed:", e, file=sys.stderr)

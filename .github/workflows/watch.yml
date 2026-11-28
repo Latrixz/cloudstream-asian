@@ -6,6 +6,11 @@ on:
   schedule:
     - cron: "0 0 * * *"   # 08:00 Singapore / Malaysia time
   workflow_dispatch:
+    inputs:
+      ping:
+        description: "Only send a test message to TELEGRAM_WATCH_CHAT (no source check)"
+        type: boolean
+        default: false
 
 concurrency:
   group: "watch"
@@ -15,7 +20,21 @@ permissions:
   contents: write
 
 jobs:
+  ping:
+    if: ${{ inputs.ping }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send a test message
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ vars.TELEGRAM_WATCH_CHAT }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT}" --data-urlencode "text=🩺 Source watcher is connected. Daily reports will arrive here." \
+            | python3 -c "import json,sys;d=json.load(sys.stdin);print('ok:',d.get('ok'),d.get('description',''));sys.exit(0 if d.get('ok') else 1)"
+
   watch:
+    if: ${{ !inputs.ping }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
