@@ -18,7 +18,12 @@ import java.util.Collections
  * The test never fails; the verdict is in the JSON so every source gets checked.
  */
 class WatcherTest {
+    companion object {
+        const val APP_USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+    }
     private val log = mutableListOf<String>()
+    private val requests: MutableList<String> = Collections.synchronizedList(mutableListOf())
     private fun note(s: String) { log += s; println("[watch] $s") }
 
     @Test
@@ -38,6 +43,20 @@ class WatcherTest {
         var httpCode: Int? = null
         // Sources that solve Cloudflare or scrape inside the app's WebView can't be fully played here.
         val needsWebView = System.getProperty("watch.webview") == "true"
+
+        // Same HTTP client set-up as the app (RequestsHelper.initClient / buildDefaultClient): a desktop
+        // Chrome user agent on every request, redirects followed, SSL errors ignored. Without it some
+        // sites answer with a block page and the watcher reports false failures.
+        app.defaultHeaders = mapOf("user-agent" to APP_USER_AGENT)
+        app.baseClient = trustAll(okhttp3.OkHttpClient.Builder().followRedirects(true).followSslRedirects(true))
+            .addInterceptor { chain ->
+                // Keep the recent requests: on a failure they show which call went wrong.
+                val req = chain.request()
+                val res = runCatching { chain.proceed(req) }
+                    .onFailure { requests += "${it.javaClass.simpleName} ${req.method} ${req.url}" }.getOrThrow()
+                requests += "${res.code} ${req.method} ${req.url} ua=${req.headers.values("User-Agent")}"
+                res
+            }.build()
 
         try {
             val api = Class.forName(providerClass).getDeclaredConstructor().newInstance() as MainAPI
@@ -72,6 +91,7 @@ class WatcherTest {
             note("failed at $stage: $detail")
         }
 
+        if (status != "playable") synchronized(requests) { requests.takeLast(6).forEach { note("http: ${it.take(180)}") } }
         if (status == "playable") stage = "done"
         else if (needsWebView) {
             // Not a real failure: CloudStream's WebView isn't available off-device.
@@ -81,7 +101,7 @@ class WatcherTest {
         out.writeText(
             """{"module":${q(module)},"site":${q(site)},"status":${q(status)},"stage":${q(stage)},""" +
                 """"detail":${q(detail.take(300))},"title":${q(title)},"link":${q(link)},""" +
-                """"http":${httpCode ?: "null"},"seconds":${(System.currentTimeMillis() - started) / 1000},"log":[${log.takeLast(8).joinToString(",") { q(it.take(200)) }}]}"""
+                """"http":${httpCode ?: "null"},"seconds":${(System.currentTimeMillis() - started) / 1000},"log":[${log.takeLast(14).joinToString(",") { q(it.take(200)) }}]}"""
         )
     }
 
@@ -163,6 +183,16 @@ class WatcherTest {
         val type = res.headers["content-type"].orEmpty()
         if (type.contains("text/html")) return "video returned a web page"
         return null
+    }
+
+    private fun trustAll(builder: okhttp3.OkHttpClient.Builder): okhttp3.OkHttpClient.Builder {
+        val trust = object : javax.net.ssl.X509TrustManager {
+            override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) {}
+            override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) {}
+            override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+        }
+        val ssl = javax.net.ssl.SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), java.security.SecureRandom()) }
+        return builder.sslSocketFactory(ssl.socketFactory, trust).hostnameVerifier { _, _ -> true }
     }
 
     private fun q(s: String?): String = if (s == null) "null" else

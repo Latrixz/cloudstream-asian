@@ -98,6 +98,7 @@ subprojects {
         // Libraries the CloudStream app ships at runtime.
         testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
         testImplementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+        testImplementation("com.github.Blatzar:NiceHttp:0.4.18") // the version the app ships (merges headers case-insensitively)
         testImplementation("dev.whyoleg.cryptography:cryptography-core:0.4.0")
         testImplementation("dev.whyoleg.cryptography:cryptography-provider-jdk:0.4.0")
     }
