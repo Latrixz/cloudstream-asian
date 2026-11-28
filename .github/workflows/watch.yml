@@ -1,0 +1,73 @@
+name: Source watcher
+# Every day: runs each source's real code (home page -> title -> links -> stream) and reports which
+# sources play. Results go to the job summary and the "watch" branch (status table + uptime history).
+# Set the repo variable TELEGRAM_WATCH_CHAT (a chat id or @channel) to also get a Telegram message.
+on:
+  schedule:
+    - cron: "0 0 * * *"   # 08:00 Singapore / Malaysia time
+  workflow_dispatch:
+
+concurrency:
+  group: "watch"
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: src
+
+      - name: Checkout status history
+        run: |
+          git clone --depth 1 --branch watch "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" state \
+            || { git init -b watch state && git -C state remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"; }
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Check every source
+        working-directory: src
+        run: |
+          chmod +x gradlew
+          ./gradlew watch --parallel --continue -q || true
+
+      - name: Re-check the ones that failed (sites are often just flaky)
+        working-directory: src
+        run: |
+          sleep 60
+          tasks=$(python3 -c "import json,glob;print(' '.join(':'+d['module']+':testReleaseUnitTest' for d in map(lambda p: json.load(open(p)), glob.glob('build/watch/*.json')) if d['status'] not in ('playable','unverified')))")
+          echo "Re-checking: $tasks"
+          [ -z "$tasks" ] || ./gradlew $tasks --parallel --continue -q || true
+
+      - name: Report
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WATCH_CHAT: ${{ vars.TELEGRAM_WATCH_CHAT }}
+          REPORT_URL: https://github.com/${{ github.repository }}/blob/watch/README.md
+        run: python3 src/scripts/watch-report.py src/build/watch state >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save status history
+        working-directory: state
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add -A
+          git commit -m "Source check $(date -u +%F)" || exit 0
+          git push origin watch
+
+      - name: Keep raw results
+        uses: actions/upload-artifact@v4
+        with:
+          name: watch-results
+          path: src/build/watch/
+          retention-days: 14

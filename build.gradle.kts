@@ -89,7 +89,47 @@ subprojects {
         // Provided by the app at runtime; the shared backup code needs it to compile.
         val compileOnly by configurations
         compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
+
+        // Source watcher (./gradlew watch): runs the real provider code on the JVM.
+        val testImplementation by configurations
+        testImplementation(files(File(gradle.gradleUserHomeDir, "caches/cloudstream/cloudstream/cloudstream.jar")))
+        testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
+        testImplementation("junit:junit:4.13.2")
+        // Libraries the CloudStream app ships at runtime.
+        testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+        testImplementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+        testImplementation("dev.whyoleg.cryptography:cryptography-core:0.4.0")
+        testImplementation("dev.whyoleg.cryptography:cryptography-provider-jdk:0.4.0")
     }
+
+    // Daily watcher wiring. The provider class is read from the Plugin's registerMainAPI(...) call.
+    android {
+        sourceSets.getByName("test").java.srcDir(rootProject.file("watcher/src"))
+        testOptions.unitTests.isReturnDefaultValues = true
+    }
+    val providerClass: String? = fileTree("src/main/kotlin").files.firstNotNullOfOrNull { f ->
+        val text = f.readText()
+        val cls = Regex("""registerMainAPI\((\w+)\(""").find(text)?.groupValues?.get(1) ?: return@firstNotNullOfOrNull null
+        val pkg = Regex("""^package\s+([\w.]+)""", RegexOption.MULTILINE).find(text)?.groupValues?.get(1)
+        if (pkg == null) cls else "$pkg.$cls"
+    }
+    val needsWebView = fileTree("src/main/kotlin").files.any { it.readText().contains(Regex("CloudflareKiller|WebViewResolver")) }
+    tasks.withType<Test>().configureEach {
+        onlyIf { providerClass != null }
+        outputs.upToDateWhen { false }
+        ignoreFailures = true
+        filter { includeTestsMatching("com.csasian.watcher.*") }
+        systemProperty("watch.module", project.name)
+        systemProperty("watch.provider", providerClass ?: "")
+        systemProperty("watch.webview", needsWebView.toString())
+        systemProperty("watch.out", rootProject.file("build/watch/${project.name}.json").absolutePath)
+        testLogging { showStandardStreams = true }
+    }
+}
+
+// ./gradlew watch  -> build/watch/<Source>.json for every source (AsianHome has no site of its own).
+tasks.register("watch") {
+    dependsOn(subprojects.filter { it.name != "AsianHome" }.map { "${it.path}:testReleaseUnitTest" })
 }
 
 task<Delete>("clean") {
