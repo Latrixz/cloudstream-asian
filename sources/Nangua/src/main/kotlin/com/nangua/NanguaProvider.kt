@@ -141,7 +141,7 @@ class NanguaProvider : MainAPI() {
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         if (request.data == HOME_ROW) {
             if (page > 1) return newHomePageResponse(request.name, emptyList(), false)
-            val home = api("/home")
+            val home = home()
             val hero = home.path("hero").toList()
             val ranked = home.path("rows").flatMap { it.path("ranking").toList() }
                 .sortedByDescending { it.path("views").asLong(0) }
@@ -151,7 +151,15 @@ class NanguaProvider : MainAPI() {
             return newHomePageResponse(request.name, items, false)
         }
         val (channel, sort) = request.data.split('|').let { it[0] to it.getOrElse(1) { "all" } }
-        val data = api("/channel/$channel?page=$page&size=$PAGE_SIZE&sort=$sort")
+        // Page 1 comes from /home, one quick call all rows share (its per-channel top 10 and newest 10): the
+        // channel API can take 10-30 s or not answer at all, and the whole home page waited on it.
+        if (page == 1) {
+            val row = runCatching { home() }.getOrNull()?.path("rows")?.firstOrNull { it.text("channel") == channel }
+            val picked = row?.path(if (sort == "new") "videos" else "ranking")?.toList().orEmpty()
+            val items = picked.filter { playable(it) }.map { it.toSearchResult() }
+            if (items.isNotEmpty()) return newHomePageResponse(request.name, items, true)
+        }
+        val data = api("/channel/$channel?page=$page&size=$PAGE_SIZE&sort=$sort", CHANNEL_TIMEOUT_S)
         val list = data.path("list").toList()
         val items = list.filter { playable(it) }.map { it.toSearchResult() }
         val hasNext = list.isNotEmpty() && page * PAGE_SIZE < data.path("total").asInt(0)
@@ -414,9 +422,19 @@ class NanguaProvider : MainAPI() {
     private fun videoId(url: String): String? =
         Regex("""(?:/play/|/video/|^)(\d+)""").find(url.substringBefore('#'))?.groupValues?.get(1)
 
+    @Volatile private var homeCache: Pair<Long, JsonNode>? = null
+
+    /** /home's data, kept for a few minutes: every home row's first page reads it. */
+    private suspend fun home(): JsonNode {
+        homeCache?.let { (at, data) -> if (System.currentTimeMillis() - at < HOME_CACHE_MS) return data }
+        return api("/home").also { homeCache = System.currentTimeMillis() to it }
+    }
+
     /** GETs an API path and returns `data`, failing on a non-zero `code`. */
-    private suspend fun api(path: String): JsonNode {
-        val root = mapper.readTree(app.get("$apiUrl$path", headers = headers).text)
+    private suspend fun api(path: String, timeoutS: Long? = null): JsonNode {
+        val response = if (timeoutS != null) app.get("$apiUrl$path", headers = headers, timeout = timeoutS)
+            else app.get("$apiUrl$path", headers = headers)
+        val root = mapper.readTree(response.text)
         if (root.path("code").asInt(-1) != 0) {
             throw ErrorLoadingException(root.path("message").asText("").ifBlank { "南瓜影视接口出错" })
         }
@@ -424,6 +442,9 @@ class NanguaProvider : MainAPI() {
     }
 
     companion object {
+        private const val HOME_CACHE_MS = 5 * 60 * 1000L
+        /** The channel API (later pages only): give up rather than hold a row up. */
+        private const val CHANNEL_TIMEOUT_S = 8L
         private const val TAG = "Nangua"
         private const val HOME_ROW = "home"
         private const val PAGE_SIZE = 60

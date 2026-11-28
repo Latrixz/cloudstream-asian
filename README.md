@@ -69,6 +69,7 @@ If these sources are useful to you, you can support their upkeep:
 | Mujizy (母鸡资源) | mujiziyuan.com | Chinese |
 | Cilixiong (磁力熊) | cilixiong.org | Chinese (top-rated movies and series, with magnet links) |
 | Kissasian | kissasian.ng | English (Asian dramas) |
+| Dramanice | dramanice.cyou | English (Asian dramas, movies, K-shows) |
 | Crackle | crackle.beauty | English |
 | Flixvision | flixvision.st | English |
 | Framextv (frameXTV) | framextv.cc | English |
@@ -80,6 +81,8 @@ If these sources are useful to you, you can support their upkeep:
 | Donghuastream (Donghuastream CS) | donghuastream.org | Chinese animation (donghua) |
 | AniKoto (AniKoto CS) | anikototv.bz | Anime (sub and dub) |
 | AnimeSuge (AnimeSuge CS) | animesuge.cz | Anime (sub and dub) |
+| Animenosub (Animenosub CS) | animenosub.to | Anime (English dub, sub and raw) |
+| Animepahe (Animepahe CS) | animepahe.ch | Anime (English sub) |
 | FourKHDHub (4KHDHub CS) | 4khdhub.one | English, Hindi, Korean movies and series |
 | Movies321 (321Movies CS) | 321movies.xyz | English (movies, TV, K-drama, anime; plays in CloudStream) |
 | Cinejoy (Cinejoy CS) | cinejoy.pk | English (movies and TV, up to 4K HDR) |

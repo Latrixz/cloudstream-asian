@@ -20,11 +20,11 @@ import urllib.request
 NAMES = {
     "Olevod": "欧乐影院 Olevod", "Kubb": "酷播 Kubb", "Uvod": "优视频 UVOD", "Mvffm": "Movieffm", "Len": "冷映 Len",
     "Huavod": "华视影院 Huavod", "Ddys": "低端影视 Ddys", "Duboku": "独播库 Duboku", "Xiaobao": "小宝影院 Xiaobao",
-    "Kissasian": "Kissasian", "Crackle": "Crackle", "Flixvision": "FlixVision", "Framextv": "FrameXTV",
+    "Kissasian": "Kissasian", "Dramanice": "Dramanice", "Crackle": "Crackle", "Flixvision": "FlixVision", "Framextv": "FrameXTV",
     "Rivestream": "Rivestream", "Rivo": "Rivo", "Movy": "Movy",
     "Huarw": "华人影院 Huarw", "Nbyy": "泥巴影院 Nbyy", "Haotv": "华视界 Haotv", "Suikan": "随便看 Suikan", "Aigua": "爱瓜TV Aigua",
     "OneTouchTV": "OneTouchTV Asia", "Kisskh": "Kisskh Asia", "Donghuastream": "Donghuastream CS",
-    "AniKoto": "AniKoto CS", "AnimeSuge": "AnimeSuge CS", "FourKHDHub": "4KHDHub CS",
+    "AniKoto": "AniKoto CS", "AnimeSuge": "AnimeSuge CS", "Animenosub": "Animenosub CS", "Animepahe": "Animepahe CS", "FourKHDHub": "4KHDHub CS",
     "Trjvod": "唐人街 Trjvod", "Csxyy": "CN影院 Csxyy", "Qwfilm": "七味网 Qwfilm", "Kpkuang": "看片狂人 Kpkuang", "Nangua": "南瓜影视 Nangua", "Ncat": "网飞猫 Ncat", "Kkys": "可可影视 Kkys", "Netflixgc": "奈飞工厂 Netflixgc", "Kankanya": "看看鸭 Kankanya", "Gqc": "共青春影院 Gqc", "Darkvod": "黑夜影院 Darkvod", "Mujizy": "母鸡资源 Mujizy", "Cilixiong": "磁力熊 Cilixiong",
     "Movies321": "321Movies CS", "Cinejoy": "Cinejoy CS", "Dm233": "233动漫 Dm233",
     "Zxcstream": "ZXCStream CS", "Reelfren": "ReelFren Shorts", "Chartdrama": "ChartDrama Shorts", "Dramatip": "DramaTip Shorts", "Dramafren": "DramaFren",

@@ -34,6 +34,7 @@ object CsSupport {
     private const val FORCE = false
 
     private const val KEY_NEXT = "csasian_support_next"
+    private const val RUN_CLAIM = "csasian.support.claimed"
     private const val DAY = 24L * 60 * 60 * 1000
     private const val LATER = 1 * DAY
     private const val LINK = "buymeacoffee.com/latrixz"
@@ -106,6 +107,9 @@ object CsSupport {
             if (FORCE) { if (shownThisRun || next == runMark) return }
             // A time further off than LATER is from the old weekly schedule: due now instead.
             else if (shownThisRun || (next != null && next > 0 && now < next && next - now <= LATER)) return
+            // One copy per app run: every plugin has its own copy of this class, and on SkyStream's engine two can
+            // check the key at the same moment and both show it. System properties are one per process, shared by all.
+            if (!FORCE && System.getProperties().putIfAbsent(RUN_CLAIM, "1") != null) return
             // Claim it before showing, so the other plugins' copies stay quiet.
             CloudStreamApp.setKeyClass(KEY_NEXT, if (FORCE) runMark else now + LATER)
             shownThisRun = true
