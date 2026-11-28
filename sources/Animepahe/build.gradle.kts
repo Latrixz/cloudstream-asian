@@ -1,5 +1,5 @@
 // Use an integer for version numbers
-version = 1
+version = 2
 
 // MegaPlay (some episodes' player) is shared with the other anime sources (sources/_anime-common).
 extensions.getByName<com.android.build.gradle.BaseExtension>("android")

@@ -31,7 +31,8 @@ import javax.crypto.spec.SecretKeySpec
  *  - Some servers (seen on "HD-1", megap.*) list segments hosted on image CDNs (tiktokcdn / ibyteimg)
  *    where each segment is a real PNG with the MPEG-TS appended after it. Browsers' hls.js copes,
  *    ExoPlayer fails with "decoding failed", so variants with image segments are dropped.
- *  - Masters with several renditions (1080p/720p/480p) are split into one link per rendition. The
+ *  - Masters with several renditions (1080p/720p/480p) are split into one link per rendition (not
+ *    when the sound is in separate audio renditions, which only the master carries). The
  *    1080p ones are often H.264 High@5.0, above some TV hardware decoders (High@4.2); ExoPlayer's
  *    adaptive switch into them fails mid-playback, so on such devices they are ranked last.
  */
@@ -160,7 +161,7 @@ object MegaPlay {
                 ?: Regex("""RESOLUTION=\d+x(\d+)""").find(line)?.groupValues?.get(1)?.toIntOrNull()
             URI(playlistUrl).resolve(uri).toString() to height
         }.distinctBy { it.first }
-        return coroutineScope {
+        val probed = coroutineScope {
             entries.map { (url, height) ->
                 async {
                     runCatching {
@@ -170,7 +171,25 @@ object MegaPlay {
                 }
             }.awaitAll()
         }
+        // Sound in separate audio renditions (#EXT-X-MEDIA:TYPE=AUDIO, e.g. Japanese and English on
+        // newer episodes) is only reachable through the master: a variant on its own plays silent.
+        // Such a master stays one link; the player picks the audio track and adapts the quality.
+        if (SEPARATE_AUDIO.containsMatchIn(text)) {
+            val usable = probed.filter { !it.images }
+            if (usable.isEmpty()) return listOf(Variant(playlistUrl, null, images = true, tooHigh = false))
+            return listOf(
+                Variant(
+                    playlistUrl,
+                    usable.mapNotNull { it.height }.maxOrNull(),
+                    images = false,
+                    tooHigh = usable.all { it.tooHigh },
+                ),
+            )
+        }
+        return probed
     }
+
+    private val SEPARATE_AUDIO = Regex("#EXT-X-MEDIA:[^\\n]*TYPE=AUDIO[^\\n]*URI=")
 
     private suspend fun probeVariant(
         url: String,
