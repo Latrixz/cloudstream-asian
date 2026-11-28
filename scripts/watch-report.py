@@ -114,7 +114,9 @@ with open(os.path.join(state_dir, "README.md"), "w") as f:
 print(report)
 
 token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_WATCH_CHAT")
-if token and chat:
+# TELEGRAM_MESSAGE_FILE: write the message there instead (the Mac run has no bot token; GitHub sends it).
+message_file = os.environ.get("TELEGRAM_MESSAGE_FILE")
+if (token and chat) or message_file:
     msg = [f"🩺 Source check {today}",
            f"✅ {counts['playable']} play · 🟡 {counts['unverified']} unverified · ⚠️ {counts['up']} no video · ❌ {counts['down']} down"]
 
@@ -130,6 +132,10 @@ if token and chat:
         msg += ["", "Still broken: " + ", ".join(label(m) for m in still)]
     if os.environ.get("REPORT_URL"):
         msg += ["", os.environ["REPORT_URL"]]
+    if message_file:
+        with open(message_file, "w") as f:
+            f.write("\n".join(msg) + "\n")
+        sys.exit(0)
     body = urllib.parse.urlencode({"chat_id": chat, "text": "\n".join(msg), "disable_web_page_preview": "true"}).encode()
     try:
         with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/sendMessage", body, timeout=30) as res:

@@ -1,14 +1,21 @@
 name: Source watcher
-# Every day: runs each source's real code (home page -> title -> links -> stream) and reports which
-# sources play. Results go to the job summary and the "watch" branch (status table + uptime history).
-# Set the repo variable TELEGRAM_WATCH_CHAT (a chat id or @channel) to also get a Telegram message.
+# Runs each source's real code (home page -> title -> links -> stream) and reports which sources play.
+# Results go to the job summary and the "watch" branch (status table + uptime history), and a Telegram
+# message to the repo variable TELEGRAM_WATCH_CHAT.
+#
+# The daily check runs on the owner's Mac (scripts/watch-local.sh): GitHub's US servers get blocked by
+# several sites and reported ~8 false failures a day. The Mac pushes its results to the "watch" branch,
+# then starts this workflow with notify=true so the message goes out with the bot token kept here.
+# Running it by hand with no options still does a full check from GitHub.
 on:
-  schedule:
-    - cron: "0 0 * * *"   # 08:00 Singapore / Malaysia time
   workflow_dispatch:
     inputs:
       ping:
         description: "Only send a test message to TELEGRAM_WATCH_CHAT (no source check)"
+        type: boolean
+        default: false
+      notify:
+        description: "Only send the latest report from the watch branch (used by the Mac run)"
         type: boolean
         default: false
 
@@ -35,8 +42,24 @@ jobs:
             --data-urlencode "chat_id=${CHAT}" --data-urlencode "text=🩺 Source watcher is connected. Daily reports will arrive here." \
             | python3 -c "import json,sys;d=json.load(sys.stdin);print('ok:',d.get('ok'),d.get('description',''));sys.exit(0 if d.get('ok') else 1)"
 
+  notify:
+    if: ${{ inputs.notify }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send the latest report
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ vars.TELEGRAM_WATCH_CHAT }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Read through the API, not raw.githubusercontent.com (its CDN can still serve yesterday's copy).
+          gh api "repos/${{ github.repository }}/contents/telegram.txt?ref=watch" --jq .content | base64 -d > message.txt
+          curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT}" --data-urlencode "text@message.txt" --data-urlencode "disable_web_page_preview=true" \
+            | python3 -c "import json,sys;d=json.load(sys.stdin);print('ok:',d.get('ok'),d.get('description',''));sys.exit(0 if d.get('ok') else 1)"
+
   watch:
-    if: ${{ !inputs.ping }}
+    if: ${{ !inputs.ping && !inputs.notify }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
