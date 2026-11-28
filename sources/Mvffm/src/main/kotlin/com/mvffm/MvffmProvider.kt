@@ -1,7 +1,10 @@
 package com.mvffm
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsCategories
 import com.csasian.shared.CsQuality
+import com.csasian.shared.CsSearch
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -35,9 +38,82 @@ class MvffmProvider : MainAPI() {
     )
     private val jsonMapper = ObjectMapper()
 
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the site's own filters:
+     * /{movies|drama}/[page/{n}/]?genres=&region=&dtyear=&tvtype=&orderby=, options as its filter chips
+     * list them. Its adult options (情色片, 寫真片, 寫真集, 倫理) are left out. The list pages have no
+     * keyword, so a search inside a category is the site's normal search.
+     */
+    private val browse = CsBrowse(this, name, browseSections(), popularSort = "week") { id, filters, query, page ->
+        if (query.isNotBlank()) return@CsBrowse searchPage(query, page)
+        val pagePath = if (page > 1) "page/$page/" else ""
+        val params = buildList {
+            listOf("genres", "region", "dtyear", "tvtype").forEach { key ->
+                filters[key]?.let { add("$key=${URLEncoder.encode(it, "UTF-8")}") }
+            }
+            add("orderby=${filters[CsCategories.SORT] ?: "date"}")
+        }.joinToString("&")
+        val document = app.get("$mainUrl/$id/$pagePath?$params", headers = browserHeaders).document
+        val items = document.select("article.item").mapNotNull { it.toListResult() }
+        val lastPage = Regex("""頁面\s*\d+\s*of\s*(\d+)""")
+            .find(document.select(".pagination").text())
+            ?.groupValues?.getOrNull(1)?.toIntOrNull() ?: page
+        // A link to the next page counts too (the page count isn't always found on page 1).
+        val nextLink = document.selectFirst("a[href*=/page/${page + 1}/]") != null
+        items to (items.isNotEmpty() && (page < lastPage || nextLink))
+    }
+
+    private fun browseSections(): List<CsBrowse.Section> {
+        fun opts(vararg pairs: Pair<String, String>) = pairs.map { (v, label) -> CsCategories.Option(v, label) }
+        val regions = listOf("歐美", "台灣", "香港", "大陸", "韓國", "日本", "泰國", "印度", "海外").map { CsCategories.Option(it) }
+        val years = (2026 downTo 2008).map { CsCategories.Option(it.toString()) } + opts("2007-1970" to "2007-1970", "1989-1900" to "1989以前")
+        // The site's sorts, newest first.
+        val sorts = opts("date" to "最新添加", "modified" to "最近更新", "week" to "周人氣", "view" to "總人氣", "rating" to "評分")
+        return listOf(
+            CsBrowse.Section(
+                "movies", "電影",
+                filters = listOf(
+                    CsCategories.Filter(
+                        "genres", "類型",
+                        opts(
+                            "action" to "動作片", "science-fiction" to "科幻片", "fantasy" to "奇幻片", "adventure" to "冒險片",
+                            "thriller" to "驚悚片", "mystery" to "懸疑片", "crime" to "犯罪片", "horror" to "恐怖片", "war" to "戰爭片",
+                            "comedy" to "喜劇片", "romance" to "愛情片", "disaster" to "災難片", "history" to "歷史片",
+                            "biography" to "傳記片", "drama" to "劇情片", "animation" to "動畫片", "family" to "家庭片",
+                            "music" to "音樂片", "western" to "西部片", "sports" to "運動片", "documentary" to "紀錄片",
+                        ),
+                    ),
+                    CsCategories.Filter("region", "地區", regions),
+                    CsCategories.Filter("dtyear", "年份", years),
+                ),
+                sorts = sorts,
+                english = "Movies",
+                glyph = "🎬",
+            ),
+            CsBrowse.Section(
+                "drama", "連續劇",
+                filters = listOf(
+                    CsCategories.Filter(
+                        "tvtype", "分類",
+                        opts(
+                            "usdrama" to "美劇", "krdrama" to "韓劇", "cndrama" to "陸劇", "twdrama" to "台劇", "jpdrama" to "日劇",
+                            "hkdrama" to "港劇", "thdrama" to "泰劇", "10" to "綜藝", "documentary-film" to "紀錄片", "anime" to "動漫",
+                        ),
+                    ),
+                    CsCategories.Filter("region", "地區", regions),
+                    CsCategories.Filter("dtyear", "年份", years),
+                ),
+                sorts = sorts,
+                english = "TV Series",
+                glyph = "📺",
+            ),
+        )
+    }
+
     // Category = "<path>|<tvtype>", mirroring the site's own filters.
     // Rows per category: 熱播 (orderby=week), 最新添加 (date), 最近更新 (modified).
-    override val mainPage = listOf(
+    // On CloudStream the "分類 Categories" row comes first.
+    override val mainPage = browse.mainPage(listOf(
         "movies|" to "電影",
         "drama|" to "連續劇",
         "drama|10" to "綜藝",
@@ -51,11 +127,17 @@ class MvffmProvider : MainAPI() {
         ).map { (order, orderLabel) ->
             MainPageData("$label · $orderLabel", "$category|$order")
         }
-    }
+    })
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val (path, tvtype, order) = request.data.split('|').let {
@@ -76,10 +158,11 @@ class MvffmProvider : MainAPI() {
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
-    override suspend fun search(query: String): List<SearchResponse> = searchPage(query, 1).first
+    override suspend fun search(query: String): List<SearchResponse> = search(query, 1).items
 
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
     override suspend fun search(query: String, page: Int): SearchResponseList {
-        val (results, hasNext) = searchPage(query, page)
+        val (results, hasNext) = CsSearch.withExtra(query, page, lang) { q, p -> searchPage(q, p) }
         return newSearchResponseList(results, hasNext)
     }
 
@@ -102,16 +185,20 @@ class MvffmProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分類 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {

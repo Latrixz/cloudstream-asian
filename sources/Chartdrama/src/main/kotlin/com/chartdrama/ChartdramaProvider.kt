@@ -2,6 +2,9 @@ package com.chartdrama
 
 import android.util.Log
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsCategories
+import com.csasian.shared.CsSearch
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
@@ -93,8 +96,40 @@ class ChartdramaProvider : MainAPI() {
     private val byKey = apps.associateBy { it.key }
     private val bySource = apps.associateBy { it.source }
 
-    override val mainPage = listOf(MainPageData("Trending on FindDrama", TRENDING)) +
-        apps.filter { it.row }.map { MainPageData(it.label, it.key) }
+    /**
+     * Category browsing (shared/CsBrowse.kt): one section per app above (the VIP-only ones stay out),
+     * from its own subdomain, most played first (the API's only order; it has no sort). The site's tags
+     * work as a genre filter there; its 663 tags fall into about 14 groups that give the same titles
+     * (CEO = Billionaire, Werewolf = Fantasy = Vampire, ...), so the filter lists one tag per group.
+     * StarShort and NovaFilck have no tags, so no filter.
+     */
+    private val browse = CsBrowse(
+        this, name,
+        apps.map { app ->
+            CsBrowse.Section(
+                app.key, app.label, english = app.label, glyph = "📱",
+                filters = if (app.key in UNTAGGED) emptyList()
+                else listOf(CsCategories.Filter(TAG_FILTER, "Genre", GENRES.map { (tag, label) -> CsCategories.Option(tag, label) })),
+            )
+        },
+    ) { id, filters, query, page ->
+        val app = byKey[id] ?: return@CsBrowse emptyList<SearchResponse>() to false
+        val root = series(app, page, CATEGORY_PAGE, query.ifBlank { null }, filters[TAG_FILTER])
+        val items = root.path("items").mapNotNull { it.toCard(app) }.map { it.toSearchResult() }
+        items to (root.path("items").size() > 0 && page * CATEGORY_PAGE < root.path("total").asInt(0))
+    }
+
+    // On CloudStream the "分类 Categories" row comes first.
+    override val mainPage = browse.mainPage(
+        listOf(MainPageData("Trending on FindDrama", TRENDING)) +
+            apps.filter { it.row }.map { MainPageData(it.label, it.key) },
+    )
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     // ---- cards ----
 
@@ -120,7 +155,7 @@ class ChartdramaProvider : MainAPI() {
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         if (request.data == TRENDING) {
@@ -145,17 +180,22 @@ class ChartdramaProvider : MainAPI() {
         return newHomePageResponse(request.name, items, page * ROW_PAGE < total)
     }
 
-    private suspend fun series(app: App, page: Int, limit: Int, query: String?): JsonNode =
+    private suspend fun series(app: App, page: Int, limit: Int, query: String?, tag: String? = null): JsonNode =
         json(buildString {
             append(app.api).append("/series?source=").append(app.source).append("&subdomain_strip=1")
             append("&page=").append(page).append("&limit=").append(limit)
             query?.let { append("&q=").append(enc(it)) }
+            tag?.let { append("&tag=").append(enc(it)) }
         })
 
     // ---- search ----
 
     /** Every app is asked on its own subdomain, all at once (each answers in well under a second). */
-    override suspend fun search(query: String): List<SearchResponse> {
+    // Also searches the title in English when it was typed in another language (shared/CsSearch.kt).
+    override suspend fun search(query: String): List<SearchResponse> =
+        CsSearch.withExtra(query, 1, "en") { q, _ -> searchOwn(q) to false }.first
+
+    private suspend fun searchOwn(query: String): List<SearchResponse> {
         val phrase = normalize(query)
         if (phrase.isEmpty()) return emptyList()
         val started = System.currentTimeMillis()
@@ -184,16 +224,20 @@ class ChartdramaProvider : MainAPI() {
     // ---- title page ----
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {
@@ -393,6 +437,20 @@ class ChartdramaProvider : MainAPI() {
         private const val TAG = "Chartdrama"
         private const val TRENDING = "trending"
         private const val ROW_PAGE = 40
+        private const val CATEGORY_PAGE = 30
+        private const val TAG_FILTER = "tag"
+
+        /** One tag per group of the site's tags (tag to label); checked 2026-11-27. */
+        private val GENRES = listOf(
+            "Romance" to "Romance", "CEO" to "CEO & Billionaire", "Revenge" to "Revenge",
+            "Fantasy" to "Fantasy & Werewolf", "Rebirth" to "Rebirth & Time Travel", "Comedy" to "Sweet & Comedy",
+            "Hidden Identity" to "Hidden Identity", "Family" to "Family & Marriage", "Action" to "Action & Thriller",
+            "Historical" to "Historical", "Urban" to "Urban", "Betrayal" to "Betrayal",
+            "Strong Female Lead" to "Strong Female Lead", "Campus" to "Campus",
+        )
+
+        /** Apps without tags on the site. */
+        private val UNTAGGED = setOf("starshort", "novafilck")
         private const val SEARCH_PER_APP = 30
         private const val SEARCH_TIMEOUT_MS = 15_000L
         private const val MAX_RESULTS = 100

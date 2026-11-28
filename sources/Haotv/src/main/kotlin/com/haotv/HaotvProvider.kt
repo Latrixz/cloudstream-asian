@@ -1,7 +1,10 @@
 package com.haotv
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsMacCms
 import com.csasian.shared.CsQuality
+import com.csasian.shared.CsSearch
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -70,18 +73,75 @@ class HaotvProvider : MainAPI() {
         Category(38, "纪录片", TvType.Documentary),
     )
 
-    // Same order as the site's home page: 推荐, then 最新X per category; plus X热播 (by hits) rows.
-    override val mainPage = listOf(MainPageData("推荐", HOME_ROW)) +
-        categories.flatMap { category ->
-            listOf(
-                MainPageData("最新${category.label}", "${category.id}|time"),
-                MainPageData("${category.label}热播", "${category.id}|hits"),
-            )
+    /**
+     * The site's own category filters (its type pages and /api.php/config/get_extra_var): sub-categories
+     * (their own type ids), 地区 and 年份, and its sorts. Pages come from the list API the site's filter page
+     * uses (type-show.js): vod_area, vod_year and vod_name (the keyword); orderby time_add / hits / score,
+     * update time when no orderby is sent. Ours start at newest added.
+     */
+    private val site = CsMacCms.Site(
+        CsMacCms.Custom { "" }, // URLs are built from the params in [browse].
+        types = listOf(
+            CsMacCms.Type(
+                "1", "电影",
+                subtypes = listOf(
+                    "6" to "动作片", "7" to "喜剧片", "8" to "爱情片", "9" to "科幻片", "10" to "恐怖片", "20" to "犯罪片",
+                    "12" to "战争片", "21" to "动漫片", "11" to "剧情片", "22" to "纪录片",
+                ),
+            ),
+            CsMacCms.Type("2", "连续剧", subtypes = listOf("13" to "国产剧", "16" to "欧美剧", "15" to "日韩剧", "14" to "港台剧", "25" to "海外剧")),
+            CsMacCms.Type("3", "综艺", subtypes = listOf("26" to "大陆综艺", "27" to "日韩综艺", "28" to "港台综艺", "29" to "欧美综艺", "30" to "海外综艺")),
+            CsMacCms.Type("4", "动漫", subtypes = listOf("31" to "国产动漫", "32" to "日本动漫", "33" to "欧美动漫", "34" to "海外动漫")),
+            CsMacCms.Type("37", "短剧"),
+            CsMacCms.Type("38", "纪录片"),
+        ),
+        areas = listOf("大陆", "香港", "台湾", "美国", "韩国", "日本", "泰国", "新加坡", "马来西亚", "印度", "英国", "法国", "加拿大", "西班牙", "俄罗斯", "其它"),
+        years = CsMacCms.years(17),
+        // The site's own sort buttons: 添加时间 (time_add), 人气 and 评分; its default is update time.
+        sorts = listOf("time_add" to "最新添加", "time" to "最近更新", "hits" to "人气", "score" to "评分"),
+    )
+
+    // Category browsing (shared/CsBrowse.kt): our own category page on CloudStream, the app's own on SkyStream Dev.
+    private val browse = CsBrowse(this, name, site.sections, popularSort = "hits") { id, filters, query, page ->
+        val params = site.params(id, filters, query, page)
+        val offset = (page - 1) * PAGE_SIZE
+        val url = buildString {
+            append("$mainUrl/api.php/vod/get_list?type_id=${params["id"]}&limit=$PAGE_SIZE&offset=$offset")
+            params["area"]?.let { append("&vod_area=").append(enc(it)) }
+            params["year"]?.let { append("&vod_year=").append(enc(it)) }
+            params["wd"]?.let { append("&vod_name=").append(enc(it)) }
+            params["by"]?.takeIf { it != "time" }?.let { append("&orderby=").append(it) }
         }
+        val type = categories.firstOrNull { it.id.toString() == id }?.type
+        val info = getJson(url)?.path("info")
+        val rows = info?.path("rows")?.toList().orEmpty()
+        val items = rows.mapNotNull { rowResult(it, type) }.distinctBy { it.url }
+        items to (rows.isNotEmpty() && offset + rows.size < (info?.path("total")?.asInt(0) ?: 0))
+    }
+
+    private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
+
+    // Same order as the site's home page: 推荐, then 最新X per category; plus X热播 (by hits) rows.
+    // On CloudStream the "分类 Categories" row comes first.
+    override val mainPage = browse.mainPage(
+        listOf(MainPageData("推荐", HOME_ROW)) +
+            categories.flatMap { category ->
+                listOf(
+                    MainPageData("最新${category.label}", "${category.id}|time"),
+                    MainPageData("${category.label}热播", "${category.id}|hits"),
+                )
+            },
+    )
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         if (request.data == HOME_ROW) {
@@ -112,7 +172,11 @@ class HaotvProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val encoded = URLEncoder.encode(query.trim(), "UTF-8").replace("+", "%20")
         val vod = getJson("$mainUrl/api.php/search/index?module=all&limit=$SEARCH_LIMIT&page=$page&wd=$encoded")
@@ -133,16 +197,20 @@ class HaotvProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {

@@ -2,7 +2,10 @@ package com.kankanya
 
 import android.util.Log
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsMacCms
 import com.csasian.shared.CsQuality
+import com.csasian.shared.CsSearch
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
@@ -68,18 +71,87 @@ class KankanyaProvider : MainAPI() {
         Category("zongyi", 3, "综艺", TvType.TvSeries, ranked = false),
     )
 
-    override val mainPage = listOf(MainPageData("热播推荐", HOME_ROW)) +
-        categories.flatMap { c ->
-            if (c.ranked) {
-                listOf(MainPageData("最新${c.label}", "${c.slug}|time"), MainPageData("热门${c.label}", "${c.slug}|hits"))
-            } else {
-                listOf(MainPageData("最新${c.label}", "${c.slug}|time"))
-            }
-        }
+    private val langs = listOf("国语", "英语", "粤语", "闽南语", "韩语", "日语", "其它")
+
+    /**
+     * The site's own filters (/show/{slug}-{area}-{by}-{class}-{lang}-----{page}---{year}.html), as its
+     * filter pages list them. The list pages also take a keyword (/wd/{q}) and aren't rate limited.
+     */
+    private val site = CsMacCms.Site(
+        CsMacCms.Dash("/show/"),
+        types = listOf(
+            CsMacCms.Type(
+                "dianying", "电影",
+                classes = listOf(
+                    "喜剧", "爱情", "恐怖", "动作", "科幻", "剧情", "战争", "警匪", "犯罪", "动画", "奇幻", "武侠", "冒险",
+                    "枪战", "悬疑", "惊悚", "经典", "青春", "文艺", "微电影", "古装", "历史", "运动", "农村", "儿童", "网络电影",
+                ),
+                areas = listOf("大陆", "香港", "台湾", "美国", "法国", "英国", "日本", "韩国", "德国", "泰国", "印度", "意大利", "西班牙", "加拿大", "其他"),
+                langs = listOf("国语", "英语", "粤语", "闽南语", "韩语", "日语", "法语", "德语", "其它"),
+                years = CsMacCms.years(17),
+            ),
+            CsMacCms.Type(
+                "juji", "剧集",
+                classes = listOf("古装", "战争", "青春偶像", "喜剧", "家庭", "犯罪", "动作", "奇幻", "剧情", "历史", "经典", "乡村", "情景", "商战", "网剧", "其他"),
+                areas = listOf("内地", "韩国", "香港", "台湾", "日本", "美国", "泰国", "英国", "新加坡", "其他"),
+            ),
+            CsMacCms.Type(
+                "dongman", "动漫",
+                classes = listOf(
+                    "情感", "科幻", "热血", "推理", "搞笑", "冒险", "萝莉", "校园", "动作", "机战", "运动", "战争", "少年",
+                    "少女", "社会", "原创", "亲子", "益智", "励志", "其他",
+                ),
+                areas = listOf("国产", "日本", "欧美", "其他"),
+            ),
+            CsMacCms.Type(
+                "zongyi", "综艺",
+                classes = listOf("选秀", "情感", "访谈", "播报", "旅游", "音乐", "美食", "纪实", "曲艺", "生活", "游戏互动", "财经", "求职"),
+                areas = listOf("内地", "港台", "日韩", "欧美"),
+            ),
+        ),
+        langs = langs,
+        years = CsMacCms.years(23),
+        sorts = listOf("time" to "最新", "hits" to "最热", "score" to "评分"),
+    )
+
+    // Category browsing (shared/CsBrowse.kt): our own category page on CloudStream, the app's own on SkyStream Dev.
+    private val browse = CsBrowse(this, name, site.sections) { id, filters, query, page ->
+        listPage(site.url(mainUrl, id, filters, query, page), categories.firstOrNull { it.slug == id }?.type, page, query)
+    }
+
+    /**
+     * One list page's cards. With a keyword the site has no pager, so a full page means there may be more.
+     * The keyword filter ignores keywords with spaces (it shows the whole list), so those find nothing here.
+     */
+    private suspend fun listPage(url: String, type: TvType?, page: Int, query: String): Pair<List<SearchResponse>, Boolean> {
+        if (query.any { it.isWhitespace() }) return emptyList<SearchResponse>() to false
+        val document = fetchDocument(url)
+        val items = document.select("a.module-poster-item").mapNotNull { it.toCard(type) }.distinctBy { it.url }
+        val hasNext = items.isNotEmpty() && (page < lastPage(document) || query.isNotBlank() && items.size >= LIST_PAGE_SIZE)
+        return items to hasNext
+    }
+
+    // On CloudStream the "分类 Categories" row comes first (see CsBrowse).
+    override val mainPage = browse.mainPage(
+        listOf(MainPageData("热播推荐", HOME_ROW)) +
+            categories.flatMap { c ->
+                if (c.ranked) {
+                    listOf(MainPageData("最新${c.label}", "${c.slug}|time"), MainPageData("热门${c.label}", "${c.slug}|hits"))
+                } else {
+                    listOf(MainPageData("最新${c.label}", "${c.slug}|time"))
+                }
+            },
+    )
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         if (request.data == HOME_ROW) {
@@ -112,7 +184,23 @@ class KankanyaProvider : MainAPI() {
     private val searchLock = Mutex()
     private var lastSearchAt = 0L
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    /**
+     * Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
+     * The site's search allows one request every 3 seconds, so the typed query uses it and the translated
+     * titles go through the keyword filter of the category lists instead, which has no such limit.
+     */
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> if (q == query) searchOwn(q, p) else listSearch(q) }
+
+    /** Page 1 of every category's list filtered by [query], merged in category order. */
+    private suspend fun listSearch(query: String): Pair<List<SearchResponse>, Boolean> = coroutineScope {
+        val pages = categories.map { c ->
+            async { runCatching { listPage(site.url(mainUrl, c.slug, emptyMap(), query, 1), c.type, 1, query).first }.getOrDefault(emptyList()) }
+        }.awaitAll()
+        pages.flatten().distinctBy { it.url } to false
+    }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val keyword = URLEncoder.encode(query.trim(), "UTF-8")
         val url = if (page <= 1) "$mainUrl/search/$keyword-------------.html"
@@ -148,16 +236,20 @@ class KankanyaProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     /** Removes the fake PNG image in front of the MPEG-TS data of disguised HLS segments. */
@@ -584,6 +676,7 @@ class KankanyaProvider : MainAPI() {
         private const val RESOLVE_CONCURRENCY = 3
         private const val RESOLVE_TIMEOUT_MS = 15_000L
         private const val SEARCH_INTERVAL_MS = 3_200L
+        private const val LIST_PAGE_SIZE = 40
         private const val SEARCH_TOO_OFTEN = "请不要频繁操作"
         private const val ALPHABET = "PXhw7UT1B0a9kQDKZsjIASmOezxYG4CHo5Jyfg2b8FLpEvRr3WtVnlqMidu6cN"
         private const val MODE1_KEY = "098f6bcd4621d373cade4e832627b4f6" // md5("test")

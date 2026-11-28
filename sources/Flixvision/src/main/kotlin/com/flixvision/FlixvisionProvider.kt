@@ -1,5 +1,8 @@
 package com.flixvision
 
+import com.csasian.shared.CsSearch
+import com.csasian.shared.CsCategories
+import com.csasian.shared.CsBrowse
 import com.csasian.shared.CsBackup
 import com.csasian.shared.CsQuality
 
@@ -39,8 +42,41 @@ class FlixvisionProvider : MainAPI() {
     private val vixsrc = "https://vixsrc.to"
     private val vidrift = "https://embed.vidrift.net"
 
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the site's own list pages: /movie and /tv, and
+     * /genre/{slug} or /country/{slug} with `?type=movie|tv`. The site lists one genre or one country
+     * at a time (they don't combine), so they share one filter. Its catalogue URLs are the site's own
+     * slugs (not TMDB ids), so the TMDB category adapter can't be used here. Lists are newest first and
+     * have no other sort. A search inside a section is the site's autocomplete, kept to that type.
+     */
+    private val browse = CsBrowse(
+        this, name,
+        listOf(
+            CsBrowse.Section("movie", "电影", listOf(flixFilter(MOVIE_GENRES)), english = "Movies", glyph = "🎬"),
+            CsBrowse.Section("tv", "电视剧", listOf(flixFilter(TV_GENRES)), english = "TV Shows", glyph = "📺"),
+        ),
+    ) { id, filters, query, page ->
+        if (query.isNotBlank()) {
+            val tv = id == "tv"
+            val found = searchOwn(query, page).first
+            return@CsBrowse found.filter { (it.type == TvType.TvSeries) == tv } to false
+        }
+        val path = filters["browse"]?.let { "/$it?type=$id" } ?: "/$id"
+        val url = if (page > 1) "$mainUrl$path${if (path.contains('?')) "&" else "?"}page=$page" else "$mainUrl$path"
+        val document = fetchPage(url)
+        val items = document.select("a.bf-card").mapNotNull { it.toCard() }.distinctBy { it.url }
+        val hasNext = document.select(".pagination a[href]").any { it.attr("href").contains("page=${page + 1}") }
+        items to (items.isNotEmpty() && hasNext)
+    }
+
+    private fun flixFilter(genres: List<Pair<String, String>>) = CsCategories.Filter(
+        "browse", "类型 / 地区 Genre / Country",
+        genres.map { (slug, label) -> CsCategories.Option("genre/$slug", label) } +
+            FLIX_COUNTRIES.map { (slug, label) -> CsCategories.Option("country/$slug", "🌏 $label") },
+    )
+
     // The site's own sections ("View All" targets of the home rails), then its genres.
-    override val mainPage = listOf(
+    override val mainPage = browse.mainPage(listOf(
         "/trending" to "Trending",
         "/new-releases" to "New Releases",
         "/new-episodes" to "New Episodes",
@@ -59,11 +95,17 @@ class FlixvisionProvider : MainAPI() {
         "/genre/crime" to "Crime",
         "/genre/romance" to "Romance",
         "/genre/documentary" to "Documentary",
-    ).map { (path, label) -> MainPageData(label, path) }
+    ).map { (path, label) -> MainPageData(label, path) })
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page > 1) "$mainUrl${request.data}?page=$page" else "$mainUrl${request.data}"
@@ -88,7 +130,11 @@ class FlixvisionProvider : MainAPI() {
      * The full results page (`/browser?keyword=`) sits behind the site's browser check, so search
      * uses the site's own autocomplete API. It returns the best 8 matches and has no paging.
      */
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the English title when the query is in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank() || page > 1) return emptyList<SearchResponse>() to false
         val encoded = URLEncoder.encode(query.trim(), "UTF-8")
         val text = app.get("$mainUrl/api/suggest?q=$encoded", headers = siteHeaders).text
@@ -117,16 +163,20 @@ class FlixvisionProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {
@@ -603,4 +653,29 @@ class FlixvisionProvider : MainAPI() {
 
     private fun JsonNode.str(key: String): String? =
         get(key)?.takeIf { !it.isNull }?.asText()?.trim()?.takeIf { it.isNotBlank() }
+
+    private companion object {
+        // The site's /genre/ pages for each type (TMDB's movie and TV genre names).
+        val MOVIE_GENRES = listOf(
+            "action" to "Action", "adventure" to "Adventure", "animation" to "Animation", "comedy" to "Comedy",
+            "crime" to "Crime", "documentary" to "Documentary", "drama" to "Drama", "family" to "Family",
+            "fantasy" to "Fantasy", "history" to "History", "horror" to "Horror", "music" to "Music",
+            "mystery" to "Mystery", "romance" to "Romance", "science-fiction" to "Science Fiction",
+            "thriller" to "Thriller", "tv-movie" to "TV Movie", "war" to "War", "western" to "Western",
+        )
+        val TV_GENRES = listOf(
+            "action-adventure" to "Action & Adventure", "animation" to "Animation", "comedy" to "Comedy",
+            "crime" to "Crime", "documentary" to "Documentary", "drama" to "Drama", "family" to "Family",
+            "kids" to "Kids", "mystery" to "Mystery", "reality" to "Reality", "sci-fi-fantasy" to "Sci-Fi & Fantasy",
+            "soap" to "Soap", "war-politics" to "War & Politics", "western" to "Western",
+        )
+        // The site's /country/ pages.
+        val FLIX_COUNTRIES = listOf(
+            "south-korea" to "South Korea", "china" to "China", "japan" to "Japan", "hong-kong" to "Hong Kong",
+            "taiwan" to "Taiwan", "thailand" to "Thailand", "india" to "India", "united-states-of-america" to "United States",
+            "united-kingdom" to "United Kingdom", "canada" to "Canada", "australia" to "Australia", "france" to "France",
+            "germany" to "Germany", "spain" to "Spain", "italy" to "Italy", "mexico" to "Mexico", "brazil" to "Brazil",
+            "turkey" to "Turkey",
+        )
+    }
 }

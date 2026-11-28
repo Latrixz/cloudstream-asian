@@ -1,5 +1,8 @@
 package com.kissasian
 
+import com.csasian.shared.CsSearch
+import com.csasian.shared.CsCategories
+import com.csasian.shared.CsBrowse
 import com.csasian.shared.CsBackup
 
 import com.lagradost.cloudstream3.*
@@ -42,8 +45,64 @@ class KissasianProvider : MainAPI() {
 
     private val zumivids = "https://zumivids.com"
 
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the site's own /series/ filters: dramas and movies as
+     * sections, genre and country, and its orders (latest added first). Its status filter is left out
+     * (only "ongoing" has titles) and so are the near-empty TV Show / Special / Anime types. A search
+     * inside a section is the site's own search (it has no filters).
+     */
+    private val browse = CsBrowse(
+        this, name,
+        listOf(
+            CsBrowse.Section("drama", "亚洲剧", kissFilters(), kissSorts(), english = "Asian Dramas", glyph = "📺"),
+            CsBrowse.Section("movie", "电影", kissFilters(), kissSorts(), english = "Movies", glyph = "🎬"),
+        ),
+        popularSort = "popular",
+    ) { id, filters, query, page ->
+        if (query.isNotBlank()) return@CsBrowse searchOwn(query, page)
+        val params = buildString {
+            append("type=").append(id)
+            filters["genre"]?.let { append("&genre%5B%5D=").append(it) }
+            filters["country"]?.let { append("&country%5B%5D=").append(it) }
+            append("&order=").append(filters[CsCategories.SORT] ?: "latest")
+        }
+        val document = app.get("$mainUrl/series/?$params&page=$page", headers = siteHeaders).document
+        val items = document.select(".listupd article.bs").mapNotNull { it.toCard() }.distinctBy { it.url }
+        items to (items.isNotEmpty() && document.selectFirst(".hpage a.r") != null)
+    }
+
+    private fun kissFilters() = listOf(
+        CsCategories.Filter(
+            "genre", "类型 Genre",
+            listOf(
+                "action" to "Action", "adventure" to "Adventure", "business" to "Business", "comedy" to "Comedy",
+                "crime" to "Crime", "documentary" to "Documentary", "drama" to "Drama", "family" to "Family",
+                "fantasy" to "Fantasy", "food" to "Food", "historical" to "Historical", "horror" to "Horror",
+                "law" to "Law", "life" to "Life", "martial-arts" to "Martial Arts", "medical" to "Medical",
+                "melodrama" to "Melodrama", "military" to "Military", "music" to "Music", "mystery" to "Mystery",
+                "political" to "Political", "psychological" to "Psychological", "romance" to "Romance",
+                "sci-fi" to "Sci-Fi", "sitcom" to "Sitcom", "sports" to "Sports", "supernatural" to "Supernatural",
+                "thriller" to "Thriller", "tokusatsu" to "Tokusatsu", "war" to "War", "wuxia" to "Wuxia", "youth" to "Youth",
+            ).map { (value, label) -> CsCategories.Option(value, label) },
+        ),
+        CsCategories.Filter(
+            "country", "地区 Country",
+            listOf(
+                "south-korea" to "South Korea", "china" to "China", "japan" to "Japan", "thailand" to "Thailand",
+                "taiwan" to "Taiwan", "hong-kong" to "Hong Kong", "philippines" to "Philippines", "singapore" to "Singapore",
+            ).map { (value, label) -> CsCategories.Option(value, label) },
+        ),
+    )
+
+    private fun kissSorts() = listOf(
+        CsCategories.Option("latest", "最新 Newest"),
+        CsCategories.Option("update", "最近更新 Last updated"),
+        CsCategories.Option("popular", "热门 Popular"),
+        CsCategories.Option("rating", "高分 Top rated"),
+    )
+
     // data = "home|<section>" for the homepage sections, otherwise the /series/ filter query.
-    override val mainPage = mainPageOf(
+    override val mainPage = browse.mainPage(mainPageOf(
         "home|latest" to "Latest Episodes",
         "home|hot" to "Hot Series Update",
         "order=update" to "Recently Updated Dramas",
@@ -59,11 +118,17 @@ class KissasianProvider : MainAPI() {
         "country%5B%5D=taiwan&order=update" to "Taiwanese Dramas",
         "country%5B%5D=philippines&order=update" to "Filipino",
         "order=rating" to "Top Rated",
-    )
+    ))
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         if (request.data.startsWith("home|")) {
@@ -94,7 +159,11 @@ class KissasianProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the English title when the query is in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val q = URLEncoder.encode(query.trim(), "UTF-8")
         val url = if (page > 1) "$mainUrl/page/$page/?s=$q" else "$mainUrl/?s=$q"
@@ -104,16 +173,20 @@ class KissasianProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {

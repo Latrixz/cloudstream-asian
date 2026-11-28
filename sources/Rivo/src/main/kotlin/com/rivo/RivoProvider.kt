@@ -1,5 +1,7 @@
 package com.rivo
 
+import com.csasian.shared.CsTmdbBrowse
+import com.csasian.shared.CsSearch
 import com.csasian.shared.CsBackup
 
 import com.fasterxml.jackson.databind.JsonNode
@@ -40,8 +42,12 @@ class RivoProvider : MainAPI() {
     private val playerHeaders
         get() = mapOf("User-Agent" to userAgent, "Referer" to "$PLAYER/", "Origin" to PLAYER)
 
+    // Category browsing (shared/CsTmdbBrowse.kt): TMDB discover through the keyless TMDB proxy (the site's
+    // API only offers fixed lists), shown as our own cards, so details and links still go through the site.
+    private val browse = CsTmdbBrowse.create(this, name) { results, kind -> toResults(results, kind) }
+
     // The lists behind the site's Movies / Shows tabs.
-    override val mainPage = mainPageOf(
+    override val mainPage = browse.mainPage(mainPageOf(
         "movie/trending" to "Trending Movies",
         "movie/popular" to "Popular Movies",
         "movie/now_playing" to "Now Playing",
@@ -50,11 +56,17 @@ class RivoProvider : MainAPI() {
         "tv/popular" to "Popular Shows",
         "tv/on_the_air" to "On The Air",
         "tv/top_rated" to "Top Rated Shows",
-    )
+    ))
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val type = request.data.substringBefore("/")
@@ -71,7 +83,11 @@ class RivoProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the English title when the query is in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val params = mapOf("q" to query.trim(), "type" to "multi", "page" to page.toString())
         // The search backend sometimes answers 502; one retry usually gets through.
@@ -80,16 +96,20 @@ class RivoProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {
@@ -262,9 +282,10 @@ class RivoProvider : MainAPI() {
             val id = item.text("id")?.takeIf { it.all(Char::isDigit) } ?: return@mapNotNull null
             val title = item.text("title") ?: item.text("name") ?: return@mapNotNull null
             val url = "$mainUrl/$type/$id"
-            val poster = image(item.text("poster"), "w342")
-            val yearValue = item.text("date")?.take(4)?.toIntOrNull()
-            val scoreValue = item["rating"]?.asDouble()?.takeIf { it > 0 }?.let { Score.from10(it) }
+            // The site's own lists use poster/date/rating; plain TMDB results (categories) poster_path etc.
+            val poster = image(item.text("poster") ?: item.text("poster_path"), "w342")
+            val yearValue = (item.text("date") ?: item.text("release_date") ?: item.text("first_air_date"))?.take(4)?.toIntOrNull()
+            val scoreValue = (item["rating"] ?: item["vote_average"])?.asDouble()?.takeIf { it > 0 }?.let { Score.from10(it) }
             if (type == "movie") {
                 newMovieSearchResponse(title, url, TvType.Movie) {
                     posterUrl = poster

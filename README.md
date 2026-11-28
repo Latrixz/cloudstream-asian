@@ -43,6 +43,7 @@ If these sources are useful to you, you can support their upkeep:
 |---|---|---|
 | Olevod | olevod.com | Chinese |
 | Kubb | kubb.tv | Chinese |
+| UVOD | uvod.tv | Chinese |
 | Mvffm (Movieffm) | mvffm.net | Chinese |
 | Len | len.tv | Chinese |
 | Huavod | huavod.com | Chinese |

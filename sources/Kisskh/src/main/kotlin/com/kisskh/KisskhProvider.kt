@@ -1,5 +1,8 @@
 package com.kisskh
 
+import com.csasian.shared.CsSearch
+import com.csasian.shared.CsCategories
+import com.csasian.shared.CsBrowse
 import com.csasian.shared.CsBackup
 
 import com.fasterxml.jackson.databind.JsonNode
@@ -53,7 +56,57 @@ class KisskhProvider : MainAPI() {
     private val jsonMapper = ObjectMapper()
 
     /** request.data = "type|country|order" for DramaList/List. */
-    override val mainPage = mainPageOf(
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the site's own list filters (DramaList/List): its four
+     * types as sections, country and status, and its orders (release date first, then last update and
+     * popularity). A search inside a section is the site's search for that type (one page).
+     */
+    private val browse = CsBrowse(
+        this, name,
+        listOf(
+            CsBrowse.Section(
+                "1", "亚洲剧", listOf(countryFilter(), statusFilter()), sorts(),
+                english = "Asian Dramas", glyph = "📺",
+            ),
+            CsBrowse.Section("2", "电影", listOf(countryFilter()), sorts(), english = "Movies", glyph = "🎬"),
+            CsBrowse.Section("3", "动漫", listOf(statusFilter()), sorts(), english = "Anime", glyph = "🐉"),
+            CsBrowse.Section("4", "美剧", listOf(statusFilter()), sorts(), english = "Hollywood", glyph = "📺"),
+        ),
+        popularSort = "1",
+    ) { id, filters, query, page ->
+        val type = id.toIntOrNull() ?: 0
+        if (query.isNotBlank()) {
+            if (page > 1) return@CsBrowse emptyList<SearchResponse>() to false
+            return@CsBrowse searchOwn(query, type) to false
+        }
+        val country = filters["country"]?.toIntOrNull() ?: 0
+        val status = filters["status"]?.toIntOrNull() ?: 0
+        val order = filters[CsCategories.SORT]?.toIntOrNull() ?: 3
+        val root = getJson(
+            "$api/DramaList/List?page=$page&type=$type&sub=0&country=$country&status=$status&order=$order&pageSize=$PAGE_SIZE",
+        )
+        val items = root.path("data").mapNotNull { it.toSearchResult(typeHint(type, country)) }
+        items to (items.isNotEmpty() && page * PAGE_SIZE < root.path("totalCount").asInt(0))
+    }
+
+    private fun countryFilter() = CsCategories.Filter(
+        "country", "地区 Country",
+        listOf(2 to "Korea", 1 to "China", 3 to "Japan", 4 to "Hong Kong", 5 to "Thailand", 7 to "Taiwan", 8 to "Philippines", 6 to "United States")
+            .map { (id, label) -> CsCategories.Option(id.toString(), label) },
+    )
+
+    private fun statusFilter() = CsCategories.Filter(
+        "status", "状态 Status",
+        listOf(CsCategories.Option("1", "Ongoing"), CsCategories.Option("2", "Completed")),
+    )
+
+    private fun sorts() = listOf(
+        CsCategories.Option("3", "最新 Newest"),
+        CsCategories.Option("2", "最近更新 Last updated"),
+        CsCategories.Option("1", "热门 Popular"),
+    )
+
+    override val mainPage = browse.mainPage(mainPageOf(
         "0|0|2" to "Latest Updates",
         "0|0|1" to "Popular",
         "1|2|2" to "Korean Dramas",
@@ -66,11 +119,17 @@ class KisskhProvider : MainAPI() {
         "2|2|1" to "Popular Korean Movies",
         "3|0|2" to "Anime",
         "4|0|2" to "Hollywood",
-    )
+    ))
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val (type, country, order) = request.data.split('|').map { it.toIntOrNull() ?: 0 }
@@ -82,25 +141,34 @@ class KisskhProvider : MainAPI() {
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
-    override suspend fun search(query: String): List<SearchResponse> {
+    // Also searches the English title when the query is in another language (shared/CsSearch.kt).
+    override suspend fun search(query: String): List<SearchResponse> =
+        CsSearch.withExtra(query, 1, lang) { q, _ -> searchOwn(q, 0) to false }.first
+
+    /** The site's search (one page); [type] 0 is every type. */
+    private suspend fun searchOwn(query: String, type: Int): List<SearchResponse> {
         if (query.isBlank()) return emptyList()
         val encoded = URLEncoder.encode(query.trim(), "UTF-8").replace("+", "%20")
-        return getJson("$api/DramaList/Search?q=$encoded&type=0")
-            .mapNotNull { it.toSearchResult(null) }
+        return getJson("$api/DramaList/Search?q=$encoded&type=$type")
+            .mapNotNull { it.toSearchResult(if (type == 0) null else typeHint(type, 0)) }
             .distinctBy { it.url }
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {
@@ -271,6 +339,8 @@ class KisskhProvider : MainAPI() {
     private fun JsonNode.toSearchResult(type: TvType?): SearchResponse? {
         val id = path("id").asLong(0).takeIf { it > 0 } ?: return null
         val title = text("title") ?: return null
+        // Title only (never the synopsis): drops e.g. "(UNCENSORED)" anime from search, rows and categories.
+        if (CsCategories.isAdultTitle(title)) return null
         val url = "$mainUrl/Drama/${slugOf(title)}?id=$id"
         val poster = text("thumbnail")
         val count = path("episodesCount").asInt(0)

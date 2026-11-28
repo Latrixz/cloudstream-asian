@@ -3,7 +3,10 @@ package com.ncat
 import android.util.Log
 import com.csasian.shared.CsAdStrip
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsCategories
 import com.csasian.shared.CsQuality
+import com.csasian.shared.CsSearch
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
@@ -83,8 +86,95 @@ class NcatProvider : MainAPI() {
         "热播综艺纪录" to TvType.TvSeries,
     )
 
-    override val mainPage = homeSections.map { MainPageData(it.first, "home|${it.first}") } +
-        channels.map { MainPageData("最新${it.label}", "show|${it.id}") }
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the site's own filter page,
+     * /show/{type}-{genre}-{area}-{lang}-{year}-{sort}-{page}.html: 类型 / 地区 / 语言 / 年份 as each channel
+     * lists them, sorts 最新 (2) / 最热 (3) / 评分 (4) / 综合 (1). The filter page has no keyword, so a search
+     * inside a category is the site's normal search.
+     */
+    private val browse = CsBrowse(this, name, browseSections(), popularSort = "3") { id, filters, query, page ->
+        if (query.isNotBlank()) return@CsBrowse searchOwn(query, page)
+        val channel = channels.firstOrNull { it.id.toString() == id } ?: channels[0]
+        val parts = listOf("genre", "area", "lang", "year").map { encode(filters[it].orEmpty()) }
+        val sort = filters[CsCategories.SORT] ?: "2"
+        val document = fetchDocument("$mainUrl/show/${channel.id}-${parts.joinToString("-")}-$sort-$page.html")
+        val items = document.select(".module-item").mapNotNull { it.toCard(channel.type) }.distinctBy { it.url }
+        items to (items.isNotEmpty() && document.selectFirst("a.page-item-next") != null)
+    }
+
+    private fun browseSections(): List<CsBrowse.Section> {
+        fun opts(vararg labels: String) = labels.map { CsCategories.Option(it) }
+        val genres = mapOf(
+            1 to opts(
+                "剧情", "喜剧", "动作", "爱情", "恐怖", "惊悚", "犯罪", "科幻", "悬疑", "奇幻", "冒险", "战争", "历史", "古装",
+                "家庭", "传记", "武侠", "歌舞", "短片", "动画", "儿童", "职场",
+            ),
+            2 to opts(
+                "剧情", "爱情", "喜剧", "犯罪", "悬疑", "古装", "动作", "家庭", "惊悚", "奇幻", "美剧", "科幻", "历史", "战争",
+                "韩剧", "武侠", "言情", "恐怖", "冒险", "都市", "职场",
+            ),
+            3 to opts(
+                "动态漫画", "剧情", "动画", "喜剧", "冒险", "动作", "奇幻", "科幻", "儿童", "搞笑", "爱情", "家庭", "短片", "热血",
+                "益智", "悬疑", "经典", "校园", "Anime", "运动", "亲子", "青春", "恋爱", "武侠", "惊悚",
+            ),
+            4 to opts(
+                "纪录", "真人秀", "记录", "脱口秀", "剧情", "历史", "喜剧", "传记", "相声", "节目", "歌舞", "冒险", "运动", "Season",
+                "犯罪", "短片", "搞笑", "晚会",
+            ),
+            6 to opts(
+                "王爷太子", "霸道总裁", "屌丝逆袭", "赘婿系列", "重生系列", "穿越短剧", "美女总裁", "娇妻系列", "龙王系列", "都市言情",
+                "逆袭", "甜宠", "虐恋", "穿越", "重生", "剧情", "科幻", "武侠", "爱情", "动作", "战争", "冒险", "其它",
+            ),
+        )
+        // The site's area values are "中国大陆" etc., shown as 大陆.
+        val world = listOf(
+            "中国大陆" to "大陆", "中国香港" to "香港", "中国台湾" to "台湾", "美国" to "美国", "日本" to "日本", "韩国" to "韩国",
+            "英国" to "英国", "法国" to "法国", "德国" to "德国", "印度" to "印度", "泰国" to "泰国", "丹麦" to "丹麦", "瑞典" to "瑞典",
+            "巴西" to "巴西", "加拿大" to "加拿大", "俄罗斯" to "俄罗斯", "意大利" to "意大利", "比利时" to "比利时", "爱尔兰" to "爱尔兰",
+            "西班牙" to "西班牙", "澳大利亚" to "澳大利亚", "其他" to "其他",
+        )
+        val areas = mapOf(
+            1 to world,
+            2 to listOf(
+                "中国大陆" to "大陆", "中国香港" to "香港", "韩国" to "韩国", "美国" to "美国", "日本" to "日本", "法国" to "法国",
+                "英国" to "英国", "德国" to "德国", "中国台湾" to "台湾", "泰国" to "泰国", "印度" to "印度", "其他" to "其他",
+            ),
+            3 to listOf("日本" to "日本") + world.filter { it.first != "日本" },
+            4 to listOf(
+                "中国大陆" to "大陆", "中国香港" to "香港", "中国台湾" to "台湾", "美国" to "美国", "日本" to "日本", "韩国" to "韩国",
+                "其他" to "其他",
+            ),
+        )
+        val langs = opts("国语", "粤语", "英语", "日语", "韩语", "法语", "其他")
+        val now = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        val years = (now downTo 2020).map { CsCategories.Option(it.toString()) } + listOf(
+            CsCategories.Option("2010_2019", "10年代"), CsCategories.Option("2000_2009", "00年代"),
+            CsCategories.Option("1990_1999", "90年代"), CsCategories.Option("1980_1989", "80年代"),
+            CsCategories.Option("0_1979", "更早"),
+        )
+        // Newest first; 短剧 has no 评分.
+        val sorts = listOf("2" to "最新", "3" to "最热", "4" to "评分", "1" to "综合")
+        return channels.map { channel ->
+            val short = channel.id == 6
+            CsBrowse.Section(
+                channel.id.toString(), channel.label,
+                filters = listOfNotNull(
+                    CsCategories.Filter("genre", "类型", genres[channel.id].orEmpty()),
+                    areas[channel.id]?.let { list -> CsCategories.Filter("area", "地区", list.map { CsCategories.Option(it.first, it.second) }) },
+                    if (short) null else CsCategories.Filter("lang", "语言", langs),
+                    if (short) null else CsCategories.Filter("year", "年份", years),
+                ),
+                sorts = sorts.filterNot { short && it.first == "4" }.map { CsCategories.Option(it.first, it.second) },
+                english = if (channel.id == 4) "Variety & Docs" else CsBrowse.englishFor(channel.label),
+            )
+        }
+    }
+
+    // On CloudStream the "分类 Categories" row comes first.
+    override val mainPage = browse.mainPage(
+        homeSections.map { MainPageData(it.first, "home|${it.first}") } +
+            channels.map { MainPageData("最新${it.label}", "show|${it.id}") },
+    )
 
     // ---------------------------------------------------------------- cdndefend + page fetching
 
@@ -150,7 +240,13 @@ class NcatProvider : MainAPI() {
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val (kind, key) = request.data.split('|', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
@@ -180,7 +276,11 @@ class NcatProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val keyword = encode(query.trim())
         val pagePart = if (page > 1) "&page=$page" else ""
@@ -214,16 +314,20 @@ class NcatProvider : MainAPI() {
     // ---------------------------------------------------------------- detail
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     /** Strips the ad clips spliced into the supply feeds' playlists (超清2 has none and passes through). */

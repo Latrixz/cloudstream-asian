@@ -1,5 +1,7 @@
 package com.crackle
 
+import com.csasian.shared.CsTmdbBrowse
+import com.csasian.shared.CsSearch
 import com.csasian.shared.CsBackup
 
 import com.fasterxml.jackson.databind.JsonNode
@@ -41,9 +43,21 @@ class CrackleProvider : MainAPI() {
         get() = mapOf("User-Agent" to userAgent, "Referer" to "$mainUrl/")
     private val vixHeaders = mapOf("User-Agent" to userAgent, "Referer" to "$VIX/")
 
+    // Category browsing (shared/CsTmdbBrowse.kt): TMDB discover through the site's own TMDB access, shown as
+    // our own cards, and like every row only titles VixSrc can play.
+    private val browse = CsTmdbBrowse.create(
+        this, name,
+        get = { pathAndQuery ->
+            val params = pathAndQuery.substringAfter('?', "").split('&').filter { it.contains('=') }.associate {
+                it.substringBefore('=') to java.net.URLDecoder.decode(it.substringAfter('='), "UTF-8")
+            }
+            tmdb(pathAndQuery.substringBefore('?'), params)
+        },
+    ) { results, kind -> playable(results, kind) }
+
     // The site's home rows (Trending Today/This Week, Popular Movies/TV), plus the Newest and
     // Top Rated sorts from its Movies and TV Shows pages.
-    override val mainPage = mainPageOf(
+    override val mainPage = browse.mainPage(mainPageOf(
         "trending/all/day" to "Trending Today",
         "trending/all/week" to "Trending This Week",
         "movie/popular" to "Popular Movies",
@@ -52,11 +66,17 @@ class CrackleProvider : MainAPI() {
         "newest/tv" to "Newest TV Shows",
         "movie/top_rated" to "Top Rated Movies",
         "tv/top_rated" to "Top Rated TV Shows",
-    )
+    ))
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val params = linkedMapOf("page" to page.toString())
@@ -96,23 +116,31 @@ class CrackleProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the English title when the query is in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val json = tmdb("search/multi", mapOf("query" to query.trim(), "page" to page.toString(), "include_adult" to "false"))
         return playable(json["results"], null) to hasNextPage(json, page)
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {

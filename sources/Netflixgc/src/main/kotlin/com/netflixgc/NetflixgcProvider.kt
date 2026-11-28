@@ -3,7 +3,10 @@ package com.netflixgc
 import android.util.Log
 import com.csasian.shared.CsAdStrip
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsMacCms
 import com.csasian.shared.CsQuality
+import com.csasian.shared.CsSearch
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
@@ -67,17 +70,103 @@ class NetflixgcProvider : MainAPI() {
     /** Home page sections worth a row (the rest are topics, news or empty). */
     private val homeRows = listOf("热播榜", "近期开播新剧", "最新热播电影", "热播新番")
 
-    override val mainPage = homeRows.map { MainPageData(it, "$HOME_PREFIX$it") } +
-        categories.flatMap { c ->
-            listOf(
-                MainPageData("最新${c.label}", "${c.id}|time"),
-                MainPageData("热门${c.label}", "${c.id}|hits"),
-            )
-        }
+    /**
+     * The site's filter page (/vodshow/{type}-{area}-{by}-{class}-{lang}-{letter}-...-{year}.html) as category
+     * browsing (shared/CsBrowse.kt): 类型 / 地区 / 语言 / 年份 / 字母 as each type lists them, sorts 按最新 /
+     * 按最热 / 按评分. Pages come from the JSON list the filter page itself loads (ds_api/vod), which has no
+     * keyword, so a search inside a category is the site's search limited to that type.
+     */
+    private val site = CsMacCms.Site(
+        CsMacCms.Custom { "" }, // Pages are POSTed to ds_api/vod in [browse].
+        types = listOf(
+            CsMacCms.Type(
+                "1", "电影",
+                classes = listOf(
+                    "喜剧", "爱情", "恐怖", "动作", "科幻", "剧情", "犯罪", "奇幻", "悬疑", "惊悚", "家庭", "冒险", "同性",
+                    "运动", "战争", "灾难", "NETFLIX", "HBO", "BBC ONE", "HULU", "APPLE TV", "FOX",
+                ),
+                langs = listOf("中文", "粤语", "闽南语", "英语", "日语", "韩语", "法语", "俄语", "德语", "泰语", "瑞典语", "印度语"),
+                years = yearsSince(1990) + "其他",
+            ),
+            CsMacCms.Type(
+                "2", "连续剧",
+                classes = listOf(
+                    "古装", "战争", "青春偶像", "喜剧", "爱情", "家庭", "犯罪", "动作", "奇幻", "剧情", "历史", "经典", "乡村",
+                    "情景", "商战", "恐怖", "悬疑", "惊悚", "冒险", "同性", "运动", "灾难", "NETFLIX", "HBO", "BBC ONE",
+                    "HULU", "APPLE TV", "FOX", "NBC", "其他",
+                ),
+            ),
+            CsMacCms.Type(
+                "3", "漫剧",
+                classes = listOf(
+                    "搞笑", "热血", "催泪", "后宫", "机战", "致郁", "百合", "推理", "校园", "音乐", "社团", "装通", "战斗", "日常",
+                    "恋爱", "冒险", "魔幻", "喜剧", "动作", "奇幻", "剧情", "动画", "科幻", "NETFLIX",
+                ),
+                areas = listOf("日本", "美国", "其他"),
+                langs = listOf("日语", "英语"),
+                years = yearsSince(1990) + "其他",
+                english = "Anime",
+            ),
+            CsMacCms.Type(
+                "23", "综艺",
+                classes = listOf("真人秀", "搞笑", "音乐", "冒险", "爱情", "喜剧", "脱口秀", "NETFLIX"),
+                areas = listOf("美国", "日本", "韩国"),
+                langs = listOf("英语", "日语", "韩语"),
+                years = yearsSince(2011) + "其他",
+            ),
+            CsMacCms.Type(
+                "24", "纪录片",
+                classes = listOf("人物", "军事", "历史", "文化", "探索", "科技", "自然", "剧情", "纪录片", "NETFLIX"),
+                areas = listOf("美国", "日本", "韩国", "英国"),
+                langs = listOf("英语", "日语", "韩语"),
+                years = yearsSince(2011) + "其他",
+            ),
+        ),
+        areas = listOf(
+            "中国", "大陆", "香港", "台湾", "美国", "韩国", "日本", "泰国", "新加坡", "马来西亚", "印度", "英国", "法国",
+            "瑞典", "瑞士", "乌克兰", "加拿大", "西班牙", "俄罗斯", "其它",
+        ),
+        langs = listOf("中文", "国语", "粤语", "闽南语", "英语", "日语", "韩语", "法语", "俄语", "德语", "泰语", "瑞典语", "印度语", "其它"),
+        years = yearsSince(2000),
+        sorts = listOf("time" to "最新", "hits" to "最热", "score" to "评分"),
+        letters = true,
+    )
+
+    /** This year back to [first], as the site lists them. */
+    private fun yearsSince(first: Int): List<String> =
+        CsMacCms.years(java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) - first + 1)
+
+    // Category browsing: our own category page on CloudStream, the app's own on SkyStream Dev.
+    private val browse = CsBrowse(this, name, site.sections, popularSort = "hits") { id, filters, query, page ->
+        if (query.isNotBlank()) return@CsBrowse searchOwn(query, page, id)
+        val params = site.params(id, filters, "", page)
+        val type = categories.firstOrNull { it.id.toString() == id }?.type ?: TvType.Movie
+        val root = listing(id.toInt(), params["by"] ?: "time", page, params)
+            ?: return@CsBrowse emptyList<SearchResponse>() to false
+        val items = root.path("list").mapNotNull { it.toApiResult(type) }.distinctBy { it.url }
+        items to (items.isNotEmpty() && page < root.path("pagecount").asInt(page))
+    }
+
+    // On CloudStream the "分类 Categories" row comes first.
+    override val mainPage = browse.mainPage(
+        homeRows.map { MainPageData(it, "$HOME_PREFIX$it") } +
+            categories.flatMap { c ->
+                listOf(
+                    MainPageData("最新${c.label}", "${c.id}|time"),
+                    MainPageData("热门${c.label}", "${c.id}|hits"),
+                )
+            },
+    )
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         if (request.data.startsWith(HOME_PREFIX)) {
@@ -94,10 +183,12 @@ class NetflixgcProvider : MainAPI() {
         return newHomePageResponse(request.name, items, items.isNotEmpty() && hasNext)
     }
 
-    private suspend fun listing(typeId: Int, order: String, page: Int): JsonNode? = runCatching {
+    /** One page of the site's list API; [filters] are MacCMS params (class, area, lang, year, letter). */
+    private suspend fun listing(typeId: Int, order: String, page: Int, filters: Map<String, String> = emptyMap()): JsonNode? = runCatching {
         val form = mapOf(
-            "type" to typeId.toString(), "class" to "", "area" to "", "lang" to "", "year" to "",
-            "state" to "", "letter" to "", "level" to "", "by" to order, "page" to page.toString(),
+            "type" to typeId.toString(), "class" to filters["class"].orEmpty(), "area" to filters["area"].orEmpty(),
+            "lang" to filters["lang"].orEmpty(), "year" to filters["year"].orEmpty(), "state" to "",
+            "letter" to filters["letter"].orEmpty(), "level" to "", "by" to order, "page" to page.toString(),
         )
         var text = ""
         for (attempt in 0..2) {
@@ -145,11 +236,19 @@ class NetflixgcProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    /** The site's search; [typeId] limits it to one type (the field after the page number). */
+    private suspend fun searchOwn(query: String, page: Int, typeId: String? = null): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val wd = URLEncoder.encode(query.trim(), "UTF-8").replace("+", "%20")
-        val url = if (page <= 1) "$mainUrl/vodsearch/$wd-------------.html"
-        else "$mainUrl/vodsearch/$wd----------$page---.html"
+        val url = when {
+            typeId != null -> "$mainUrl/vodsearch/$wd----------$page--$typeId-.html"
+            page <= 1 -> "$mainUrl/vodsearch/$wd-------------.html"
+            else -> "$mainUrl/vodsearch/$wd----------$page---.html"
+        }
         val document = getPage(url)
         val results = document.select(".search-list").mapNotNull { box ->
             val link = box.selectFirst("a[href*=/voddetail/]") ?: return@mapNotNull null
@@ -164,16 +263,20 @@ class NetflixgcProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     /**

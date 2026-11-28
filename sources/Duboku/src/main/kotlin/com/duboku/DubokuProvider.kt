@@ -1,7 +1,10 @@
 package com.duboku
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsMacCms
 import com.csasian.shared.CsQuality
+import com.csasian.shared.CsSearch
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -45,7 +48,64 @@ class DubokuProvider : MainAPI() {
      * There is no "time added" sort, so 最新添加 walks the year filters newest first
      * (2026, 2025, …, 更早), which together cover the whole category.
      */
-    override val mainPage = listOf(
+    /** The site's own filters, as its /vodshow/ filter pages list them (时间 = last update, newest first). */
+    private val site = CsMacCms.Site(
+        CsMacCms.Dash("/vodshow/"),
+        types = listOf(
+            CsMacCms.Type(
+                "2", "连续剧",
+                subtypes = listOf("13" to "陆剧", "15" to "日韩剧", "14" to "台泰剧", "21" to "短剧"),
+                classes = listOf(
+                    "悬疑", "武侠", "科幻", "都市", "爱情", "古装", "战争", "青春", "偶像", "喜剧", "家庭", "奇幻", "剧情",
+                    "乡村", "年代", "警匪", "谍战", "历险", "罪案", "宫廷", "经典", "动作", "惊悚", "历史", "穿越", "同性",
+                ),
+                areas = listOf("大陆", "台湾", "韩国", "日本", "新加坡", "泰国"),
+                langs = listOf("国语", "韩语", "泰语", "日语"),
+                years = CsMacCms.years(10) + "更早",
+            ),
+            CsMacCms.Type(
+                "1", "电影",
+                classes = listOf(
+                    "喜剧", "爱情", "恐怖", "动作", "科幻", "剧情", "警匪", "战争", "犯罪", "动画", "奇幻", "武侠", "冒险",
+                    "悬疑", "惊悚", "古装", "同性",
+                ),
+                areas = listOf("大陆", "台湾", "韩国", "英国", "法国", "加拿大", "澳大利亚"),
+                langs = listOf("国语", "韩语", "英语", "法语"),
+                years = CsMacCms.years(8),
+            ),
+            CsMacCms.Type(
+                "3", "综艺",
+                classes = listOf("真人秀", "选秀", "竞演", "情感", "旅游", "音乐", "美食", "纪实", "生活", "游戏互动", "竞技", "搞笑", "脱口秀"),
+                areas = listOf("大陆", "韩国"),
+                langs = listOf("国语", "韩语"),
+                years = CsMacCms.years(8) + "更早",
+            ),
+            CsMacCms.Type(
+                "4", "动漫",
+                classes = listOf("武侠", "科幻", "热血", "推理", "爆笑", "冒险", "校园", "动作", "机战", "竞技", "少女", "格斗", "恋爱", "魔幻"),
+                areas = listOf("大陆", "日本", "法国", "美国"),
+                langs = listOf("国语", "日语", "英语"),
+                years = CsMacCms.years(10),
+            ),
+        ),
+        sorts = listOf("时间" to "最新", "人气" to "最热", "评分" to "评分"),
+    )
+
+    /**
+     * Category browsing (shared/CsBrowse.kt). The list pages ignore keywords, so a search in a category
+     * is the site's own search (all categories, at most 30 titles).
+     */
+    private val browse = CsBrowse(this, name, site.sections) { id, filters, query, page ->
+        if (query.isNotBlank()) return@CsBrowse searchOwn(query, page)
+        val type = typeForCategory(filters[CsMacCms.TYPE] ?: id)
+        val document = getDocument(site.url(mainUrl, id, filters, "", page))
+        val (current, last) = pageInfo(document)
+        val items = listItems(document)
+        items.map { it.toSearchResponse(type) } to (items.isNotEmpty() && current < last)
+    }
+
+    // On CloudStream the "分类 Categories" row comes first (see CsBrowse).
+    override val mainPage = browse.mainPage(listOf(
         "2" to "连续剧",
         "13" to "陆剧",
         "15" to "日韩剧",
@@ -62,11 +122,17 @@ class DubokuProvider : MainAPI() {
         ).map { (order, orderLabel) ->
             MainPageData("$label · $orderLabel", "$category|$order")
         }
-    }
+    })
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val category = request.data.substringBefore('|')
@@ -155,7 +221,11 @@ class DubokuProvider : MainAPI() {
      * The site's search returns at most 30 results and ignores every paging parameter
      * (path or query), so only page 1 has results.
      */
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank() || page > 1) return emptyList<SearchResponse>() to false
         val encoded = URLEncoder.encode(query.trim(), "UTF-8")
         val document = getDocument("$mainUrl/vodsearch/-------------.html?wd=$encoded")
@@ -175,16 +245,20 @@ class DubokuProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {

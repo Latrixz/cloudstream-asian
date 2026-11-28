@@ -2,7 +2,9 @@ package com.reelfren
 
 import android.util.Log
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
 import com.csasian.shared.CsLogos
+import com.csasian.shared.CsSearch
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
@@ -102,8 +104,27 @@ class ReelfrenProvider : MainAPI() {
         // SkyStream's player can't, so the row is left out there.
     ) + if (CsLogos.onSkyStream) emptyList() else listOf(App("Melolo", listOf("melolo")))
 
-    override val mainPage = listOf(MainPageData("Latest on ReelFren", LATEST)) +
-        apps.filter { it.row }.map { MainPageData(it.label, it.feeds.joinToString(",")) }
+    /**
+     * Category browsing (shared/CsBrowse.kt): one section per app (every app above, rows or not), its
+     * feed in the site's own order; the API has no filters or sorts. A search in a section reads the
+     * app's whole feed and matches titles.
+     */
+    private val browse = CsBrowse(
+        this, name,
+        apps.map { CsBrowse.Section(it.feeds.first(), it.label, english = it.label, glyph = "📱") },
+    ) { id, _, query, page -> appPage(id, query, page) }
+
+    // On CloudStream the "分类 Categories" row comes first.
+    override val mainPage = browse.mainPage(
+        listOf(MainPageData("Latest on ReelFren", LATEST)) +
+            apps.filter { it.row }.map { MainPageData(it.label, it.feeds.joinToString(",")) },
+    )
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     // ---- feeds ----
 
@@ -167,7 +188,24 @@ class ReelfrenProvider : MainAPI() {
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    /** Page [page] of an app's section: its feed(s) in order, or, for [query], the titles that match. */
+    private suspend fun appPage(id: String, query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+        val app = apps.firstOrNull { it.feeds.first() == id } ?: return emptyList<SearchResponse>() to false
+        val sources = app.feeds.map { feed(it) }
+        val want = page * CATEGORY_PAGE
+        var rounds = 0
+        // A search needs the whole feed; a plain page only enough of it.
+        while ((query.isNotBlank() || merged(sources).size < want) && sources.any { !it.done } && rounds++ < MAX_ROUNDS) {
+            coroutineScope { sources.filter { !it.done }.map { async { more(it) } }.awaitAll() }
+        }
+        val all = if (query.isBlank()) merged(sources) else matching(merged(sources), query)
+        val items = all.drop((page - 1) * CATEGORY_PAGE).take(CATEGORY_PAGE).map { it.toSearchResult() }
+        val hasNext = all.size > want || (query.isBlank() && sources.any { !it.done })
+        Log.i(TAG, "section ${app.label} '$query' page $page: ${items.size} cards, next=$hasNext")
+        return items to hasNext
+    }
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val sources = if (request.data == LATEST) listOf(feed(null)) else request.data.split(',').map { feed(it) }
@@ -201,9 +239,12 @@ class ReelfrenProvider : MainAPI() {
      * There's no search API, so this reads the mixed home feed (two pages) and the first page of
      * every app's own feed, all at once, then matches titles. The feeds stay cached for 10 minutes.
      */
-    override suspend fun search(query: String): List<SearchResponse> {
-        val words = normalize(query).split(' ').filter { it.isNotBlank() }
-        if (words.isEmpty()) return emptyList()
+    // Also searches the title in English when it was typed in another language (shared/CsSearch.kt).
+    override suspend fun search(query: String): List<SearchResponse> =
+        CsSearch.withExtra(query, 1, "en") { q, _ -> searchOwn(q) to false }.first
+
+    private suspend fun searchOwn(query: String): List<SearchResponse> {
+        if (normalize(query).isEmpty()) return emptyList()
         val started = System.currentTimeMillis()
         val home = feed(null)
         val appFeeds = (KNOWN_FEEDS + synchronized(home) { home.cards.map { it.provider } }).distinct()
@@ -220,32 +261,42 @@ class ReelfrenProvider : MainAPI() {
         }
         val all = (listOf(home) + appFeeds).flatMap { f -> synchronized(f) { f.cards.toList() } }
             .distinctBy { it.key }
+        val hits = matching(all, query).take(MAX_RESULTS)
+        Log.i(TAG, "search '$query': ${hits.size} of ${all.size} titles in ${System.currentTimeMillis() - started}ms")
+        return hits.map { it.toSearchResult() }
+    }
+
+    /** The cards whose title has every word of [query], closest first, without repeats. */
+    private fun matching(all: List<Card>, query: String): List<Card> {
+        val words = normalize(query).split(' ').filter { it.isNotBlank() }
+        if (words.isEmpty()) return emptyList()
         val phrase = words.joinToString(" ")
-        val hits = all.filter { card -> normalize(card.title).let { t -> words.all { it in t } } }
+        return all.filter { card -> normalize(card.title).let { t -> words.all { it in t } } }
             .sortedWith(compareBy<Card>(
                 { normalize(it.title) != phrase },
                 { !normalize(it.title).startsWith(phrase) },
                 { !Regex("""\b${Regex.escape(phrase)}\b""").containsMatchIn(normalize(it.title)) },
             ))
             .distinctBy { normalize(it.title) + "|" + it.episodes }
-            .take(MAX_RESULTS)
-        Log.i(TAG, "search '$query': ${hits.size} of ${all.size} titles in ${System.currentTimeMillis() - started}ms")
-        return hits.map { it.toSearchResult() }
     }
 
     // ---- title page ----
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     /** Decrypts Melolo's encrypted MP4s (links that carry a key); everything else passes through. */
@@ -533,6 +584,8 @@ class ReelfrenProvider : MainAPI() {
         private const val API = "https://api.reelfren.net"
         private const val LATEST = "latest"
         private const val ROW_PAGE = 40
+        private const val CATEGORY_PAGE = 30
+        private const val MAX_ROUNDS = 10
         private const val CACHE_MS = 10 * 60_000L
         private const val SEARCH_TIMEOUT_MS = 20_000L
         private const val MAX_RESULTS = 80

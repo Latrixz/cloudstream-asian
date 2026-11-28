@@ -1,5 +1,7 @@
 package com.movies321
 
+import com.csasian.shared.CsTmdbBrowse
+import com.csasian.shared.CsSearch
 import android.util.Log
 import com.csasian.shared.CsBackup
 import com.csasian.shared.CsLogos
@@ -62,8 +64,12 @@ class Movies321Provider : MainAPI() {
     private val siteHeaders
         get() = mapOf("User-Agent" to USER_AGENT, "Referer" to "$mainUrl/")
 
+    // Category browsing (shared/CsTmdbBrowse.kt): TMDB discover through the same TMDB route as the rows,
+    // shown as our own cards (so details and links still go through this source).
+    private val browse = CsTmdbBrowse.create(this, name, get = { tmdb(it) }) { results, kind -> toResults(results, kind) }
+
     // TMDB lists behind the site's Trending / Popular / Top Rated rows, plus K-drama and anime.
-    override val mainPage = mainPageOf(
+    override val mainPage = browse.mainPage(mainPageOf(
         "trending/movie/week" to "Trending Movies",
         "trending/tv/week" to "Trending TV Shows",
         "movie/popular" to "Popular Movies",
@@ -72,11 +78,17 @@ class Movies321Provider : MainAPI() {
         "tv/top_rated" to "Top Rated TV Shows",
         "discover/tv?with_original_language=ko&sort_by=popularity.desc&vote_count.gte=20" to "K-Drama",
         "discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc" to "Anime",
-    )
+    ))
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val path = request.data
@@ -97,23 +109,31 @@ class Movies321Provider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the English title when the query is in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val json = tmdb("search/multi?query=${enc(query.trim())}&page=$page&include_adult=false")
         return toResults(json["results"], null) to hasNextPage(json, page)
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {

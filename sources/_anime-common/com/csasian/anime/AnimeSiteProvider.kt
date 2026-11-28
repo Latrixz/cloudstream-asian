@@ -1,6 +1,9 @@
 package com.csasian.anime
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsCategories
+import com.csasian.shared.CsSearch
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addMalId
@@ -41,7 +44,78 @@ abstract class AnimeSiteProvider : MainAPI() {
     private val ajaxHeaders get() = pageHeaders + ("X-Requested-With" to "XMLHttpRequest")
     private val mapper = ObjectMapper()
 
-    override val mainPage = listOf(
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the sites' own /filter page: TV series, movies and
+     * OVA / ONA / specials as sections; genre (the ids both sites share, adult ones left out), status,
+     * year, season and sub/dub; newest release first, then last updated, most viewed and score.
+     * A search inside a section is the same filter page with the keyword. Lazy, because the subclass
+     * sets the source's name after this class is built.
+     */
+    private val browse by lazy {
+        CsBrowse(
+            this, name,
+            listOf(
+                CsBrowse.Section("tv", "动漫", animeFilters(), animeSorts(), english = "TV Series", glyph = "🐉"),
+                CsBrowse.Section("movie", "剧场版", animeFilters(), animeSorts(), english = "Anime Movies", glyph = "🎬"),
+                CsBrowse.Section("ova", "OVA 特别篇", animeFilters(), animeSorts(), english = "OVA / ONA / Specials", glyph = "🎞"),
+            ),
+            popularSort = "most-viewed",
+        ) { id, filters, query, page ->
+            val params = buildList {
+                if (query.isNotBlank()) add("keyword=" + URLEncoder.encode(query, "UTF-8"))
+                SECTION_TYPES[id].orEmpty().forEach { add("term_type[]=" + URLEncoder.encode(it, "UTF-8")) }
+                filters["genre"]?.let { add("genre[]=$it") }
+                filters["status"]?.let { add("status[]=$it") }
+                filters["year"]?.let { add("year[]=$it") }
+                filters["season"]?.let { add("season[]=$it") }
+                filters["language"]?.let { add("language[]=$it") }
+                add("sort=" + (filters[CsCategories.SORT] ?: "release-date"))
+            }
+            filterPage(params.joinToString("&"), page)
+        }
+    }
+
+    private fun animeFilters() = listOf(
+        CsCategories.Filter(
+            "genre", "类型 Genre",
+            listOf(
+                "1" to "Action", "2" to "Adventure", "538" to "Cars", "8" to "Comedy", "453" to "Dementia", "119" to "Demons",
+                "62" to "Drama", "3" to "Fantasy", "180" to "Game", "215" to "Harem", "70" to "Historical", "222" to "Horror",
+                "74" to "Isekai", "404" to "Josei", "46" to "Kids", "203" to "Magic", "114" to "Martial Arts", "123" to "Mecha",
+                "125" to "Military", "242" to "Music", "57" to "Mystery", "162" to "Parody", "136" to "Police",
+                "73" to "Psychological", "28" to "Romance", "163" to "Samurai", "14" to "School", "12" to "Sci-Fi",
+                "50" to "Seinen", "252" to "Shoujo", "15" to "Shounen", "35" to "Slice of Life", "124" to "Space",
+                "29" to "Sports", "16" to "Super Power", "9" to "Supernatural", "54" to "Thriller", "58" to "Vampire",
+            ).map { (value, label) -> CsCategories.Option(value, label) },
+        ),
+        CsCategories.Filter(
+            "status", "状态 Status",
+            listOf(
+                CsCategories.Option("currently-airing", "Airing"),
+                CsCategories.Option("finished-airing", "Finished"),
+                CsCategories.Option("not-yet-aired", "Not yet aired"),
+            ),
+        ),
+        CsCategories.Filter("year", "年份 Year", CsBrowse.years(30)),
+        CsCategories.Filter(
+            "season", "季度 Season",
+            listOf("winter" to "Winter", "spring" to "Spring", "summer" to "Summer", "fall" to "Fall")
+                .map { (value, label) -> CsCategories.Option(value, label) },
+        ),
+        CsCategories.Filter(
+            "language", "语言 Audio",
+            listOf(CsCategories.Option("sub", "Sub"), CsCategories.Option("dub", "Dub")),
+        ),
+    )
+
+    private fun animeSorts() = listOf(
+        CsCategories.Option("release-date", "最新 Newest"),
+        CsCategories.Option("latest-updated", "最近更新 Last updated"),
+        CsCategories.Option("most-viewed", "热门 Most viewed"),
+        CsCategories.Option("score", "高分 Top rated"),
+    )
+
+    private val rows = listOf(
         MainPageData("Recently Updated", "sort=recently_updated"),
         MainPageData("Top Airing", "status[]=currently-airing&sort=most-viewed"),
         MainPageData("Most Viewed", "sort=most-viewed"),
@@ -52,9 +126,18 @@ abstract class AnimeSiteProvider : MainAPI() {
         MainPageData("TV Series", "term_type[]=TV&sort=recently_updated"),
     )
 
+    // On CloudStream the "分类 Categories" row comes first.
+    override val mainPage: List<MainPageData> by lazy { browse.mainPage(rows) }
+
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val (items, hasNext) = filterPage(request.data, page)
@@ -70,7 +153,11 @@ abstract class AnimeSiteProvider : MainAPI() {
         return newSearchResponseList(items, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the English title when the query is in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         return filterPage("keyword=${URLEncoder.encode(query.trim(), "UTF-8")}", page)
     }
@@ -88,16 +175,20 @@ abstract class AnimeSiteProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {
@@ -332,4 +423,13 @@ abstract class AnimeSiteProvider : MainAPI() {
     }
 
     private fun tvTypeOf(text: String): TvType = tvTypeOrNull(text) ?: TvType.Anime
+
+    private companion object {
+        /** The filter page's term_type[] values per category section. */
+        val SECTION_TYPES = mapOf(
+            "tv" to listOf("TV", "TV_SHORT"),
+            "movie" to listOf("Movie"),
+            "ova" to listOf("OVA", "ONA", "Special", "TV Special"),
+        )
+    }
 }

@@ -1,6 +1,9 @@
 package com.aigua
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsCategories
+import com.csasian.shared.CsSearch
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -57,19 +60,98 @@ class AiguaProvider : MainAPI() {
         Channel(32, "纪录片", TvType.Documentary),
     )
 
-    override val mainPage = listOf(MainPageData("首页推荐", HOME_ROW)) +
-        channels.flatMap { channel ->
-            listOfNotNull(
-                MainPageData("最新${channel.label}", "${channel.id}|new"),
-                MainPageData("热门${channel.label}", "${channel.id}|hot"),
-                // Score rows only where there's enough rated content to make them interesting.
-                if (channel.id == 1 || channel.id == 2) MainPageData("高分${channel.label}", "${channel.id}|score") else null,
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the site's own list page (/video/list?channel_id=):
+     * /video/refresh-cate?channel_id=&tag=&area=&year=&sort=, with the 类型 / 地区 / 年份 ids it lists.
+     * That endpoint has no keyword, so a search inside a category is the site's normal search.
+     */
+    private val browse = CsBrowse(this, name, browseSections(), popularSort = "hot") { id, filters, query, page ->
+        if (query.isNotBlank()) return@CsBrowse searchOwn(query, page)
+        val root = getJson(
+            "$mainUrl/video/refresh-cate?channel_id=$id&tag=${filters["tag"].orEmpty()}&area=${filters["area"].orEmpty()}" +
+                "&year=${filters["year"].orEmpty()}&page_num=$page&page_size=$PAGE_SIZE" +
+                "&sort=${filters[CsCategories.SORT] ?: "new"}&sorttype=desc",
+        )
+        val data = root?.path("data")
+        val items = data?.path("list")?.mapNotNull { it.toListResult() }?.distinctBy { it.url }.orEmpty()
+        items to (items.isNotEmpty() && page < (data?.path("total_page")?.asInt(0) ?: 0))
+    }
+
+    private fun browseSections(): List<CsBrowse.Section> {
+        fun opts(vararg pairs: Pair<String, String>) = pairs.map { (v, label) -> CsCategories.Option(v, label) }
+        val tags = mapOf(
+            1 to opts(
+                "179" to "魔幻", "154" to "动作", "159" to "科幻", "156" to "惊悚", "157" to "犯罪", "161" to "剧情", "160" to "悬疑",
+                "226" to "奇幻", "155" to "爱情", "164" to "战争", "169" to "恐怖", "153" to "喜剧", "280" to "冒险", "281" to "灾难",
+                "282" to "歌舞", "283" to "动画", "284" to "经典", "285" to "同性", "286" to "网络电影", "178" to "其他",
+            ),
+            2 to opts(
+                "364" to "短剧", "251" to "偶像", "252" to "爱情", "253" to "言情", "254" to "古装", "255" to "历史", "256" to "玄幻",
+                "257" to "谍战", "258" to "历险", "259" to "都市", "260" to "科幻", "261" to "军旅", "262" to "喜剧", "263" to "武侠",
+                "264" to "江湖", "265" to "罪案", "266" to "青春", "267" to "家庭", "268" to "战争", "269" to "悬疑", "270" to "穿越",
+                "271" to "宫廷", "272" to "神话", "273" to "商战", "274" to "警匪", "275" to "动作", "276" to "惊悚", "277" to "剧情",
+                "278" to "同性", "279" to "奇幻", "386" to "恐怖", "387" to "纪录片", "388" to "犯罪", "389" to "传记", "231" to "其他",
+            ),
+            3 to opts(
+                "229" to "生活", "228" to "脱口秀", "227" to "真人秀", "168" to "访谈", "287" to "选秀", "288" to "网综",
+                "289" to "搞笑", "290" to "竞技", "291" to "情感", "292" to "演唱会", "293" to "晚会", "232" to "其他",
+            ),
+            4 to opts(
+                "363" to "儿童", "167" to "格斗", "165" to "热血", "166" to "机战", "294" to "少女", "295" to "竞技", "296" to "科幻",
+                "297" to "爆笑", "298" to "推理", "299" to "魔幻", "300" to "冒险", "301" to "恋爱", "302" to "校园", "303" to "治愈",
+                "304" to "泡面", "305" to "穿越", "306" to "灵异", "307" to "耽美", "308" to "剧场版", "170" to "其他",
+            ),
+            32 to opts(
+                "234" to "文化", "309" to "科技", "310" to "历史", "311" to "人物", "312" to "自然", "236" to "军事",
+                "237" to "解密", "235" to "探索", "238" to "其他",
+            ),
+        )
+        val areas = opts(
+            "18" to "国产", "19" to "欧美", "24" to "日本", "20" to "香港", "21" to "韩国", "31" to "泰国", "23" to "台湾",
+            "22" to "英国", "29" to "东南亚", "30" to "其它",
+        )
+        val years = opts(
+            "132" to "2026", "131" to "2025", "130" to "2024", "129" to "2023", "21" to "2022", "22" to "2021", "23" to "2020",
+            "24" to "2019", "25" to "2018", "26" to "2017", "27" to "2016", "28" to "2015", "29" to "2014", "30" to "2013",
+            "31" to "2012", "32" to "2011", "33" to "2010", "34" to "2009", "35" to "2008", "127" to "更早",
+        )
+        // The site's sorts, newest first.
+        val sorts = opts("new" to "最新添加", "hot" to "人气", "score" to "评分")
+        return channels.map { channel ->
+            CsBrowse.Section(
+                channel.id.toString(), channel.label,
+                filters = listOf(
+                    CsCategories.Filter("tag", "类型", tags[channel.id].orEmpty()),
+                    CsCategories.Filter("area", "地区", areas),
+                    CsCategories.Filter("year", "年份", years),
+                ),
+                sorts = sorts,
             )
         }
+    }
+
+    // On CloudStream the "分类 Categories" row comes first.
+    override val mainPage = browse.mainPage(
+        listOf(MainPageData("首页推荐", HOME_ROW)) +
+            channels.flatMap { channel ->
+                listOfNotNull(
+                    MainPageData("最新${channel.label}", "${channel.id}|new"),
+                    MainPageData("热门${channel.label}", "${channel.id}|hot"),
+                    // Score rows only where there's enough rated content to make them interesting.
+                    if (channel.id == 1 || channel.id == 2) MainPageData("高分${channel.label}", "${channel.id}|score") else null,
+                )
+            },
+    )
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         if (request.data == HOME_ROW) {
@@ -114,7 +196,11 @@ class AiguaProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val document = searchDocument(query.trim(), page)
         val results = document.select(".SSbox").mapNotNull { box ->
@@ -137,16 +223,20 @@ class AiguaProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private val cloudflare by lazy { com.lagradost.cloudstream3.network.CloudflareKiller() }

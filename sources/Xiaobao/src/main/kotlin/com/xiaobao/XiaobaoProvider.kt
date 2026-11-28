@@ -1,6 +1,9 @@
 package com.xiaobao
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsMacCms
+import com.csasian.shared.CsSearch
 import com.csasian.shared.CsQuality
 
 import com.fasterxml.jackson.databind.JsonNode
@@ -50,31 +53,109 @@ class XiaobaoProvider : MainAPI() {
     private val jsonMapper = ObjectMapper()
 
     /**
+     * The site's own filters (/vod/show/area/{a}/by/{by}/class/{c}/id/{tid}/lang/{l}/page/{n}/wd/{q}/year/{y}.html),
+     * as listed on its filter pages; a sub-category is its own type id. The 伦理 class is left out.
+     */
+    private val site = CsMacCms.Site(
+        CsMacCms.Path("/vod/show/", idInPath = false),
+        types = listOf(
+            CsMacCms.Type(
+                "1", "电影",
+                classes = listOf(
+                    "爱情", "古装", "动作", "悬疑", "犯罪", "谍战", "历史", "喜剧", "奇幻", "科幻", "家庭", "青春", "剧情",
+                    "冒险", "纪录", "动画", "人物", "文化", "其他",
+                ),
+                subtypes = listOf(
+                    "101" to "动作片", "102" to "喜剧片", "103" to "爱情片", "104" to "科幻片", "105" to "剧情片", "106" to "悬疑片",
+                    "107" to "惊悚片", "108" to "恐怖片", "109" to "犯罪片", "111" to "冒险片", "112" to "奇幻片", "113" to "灾难片",
+                    "114" to "战争片", "115" to "动画电影片", "116" to "歌舞片", "117" to "网络电影片", "118" to "同性片",
+                    "121" to "经典片", "122" to "其它片",
+                ),
+            ),
+            CsMacCms.Type(
+                "2", "电视剧",
+                classes = listOf(
+                    "爱情", "古装", "悬疑", "都市", "喜剧", "战争", "剧情", "青春", "历史", "网剧", "奇幻", "冒险", "励志",
+                    "犯罪", "商战", "恐怖", "穿越", "农村", "人物", "商业", "生活", "其他",
+                ),
+                subtypes = listOf(
+                    "201" to "国产剧", "202" to "港台剧", "203" to "台湾剧", "204" to "日韩剧", "205" to "日本剧", "206" to "欧美剧",
+                    "207" to "泰国剧", "208" to "海外剧", "209" to "新马泰剧", "210" to "其他剧",
+                ),
+            ),
+            CsMacCms.Type(
+                "4", "综艺",
+                classes = listOf(
+                    "游戏", "脱口秀", "音乐", "情感", "生活", "职场", "真人秀", "搞笑", "公益", "艺术", "访谈", "益智", "体育",
+                    "少儿", "时尚", "人物", "其他",
+                ),
+                subtypes = listOf("401" to "大陆综艺", "402" to "日韩综艺", "404" to "港台综艺", "406" to "欧美综艺", "407" to "新马泰综艺", "410" to "其它综艺"),
+            ),
+            CsMacCms.Type(
+                "3", "动漫",
+                classes = listOf(
+                    "冒险", "战斗", "搞笑", "经典", "科幻", "玄幻", "魔幻", "武侠", "恋爱", "推理", "日常", "校园", "悬疑", "真人",
+                    "历史", "竞技", "其他",
+                ),
+                subtypes = listOf("301" to "国产动漫", "302" to "日韩动漫", "304" to "港台动漫", "306" to "欧美动漫", "310" to "其它动漫"),
+            ),
+            CsMacCms.Type("11", "短剧", classes = listOf("古装", "复仇", "强者", "悬疑", "甜宠", "神豪", "穿越", "虐恋", "逆袭", "重生", "萌宝")),
+            CsMacCms.Type("124", "纪录片"),
+        ),
+        areas = listOf(
+            "中国大陆", "中国香港", "中国台湾", "欧美", "韩国", "日本", "泰国", "新加坡", "马来西亚", "印度", "英国", "法国",
+            "加拿大", "西班牙", "俄罗斯", "其它",
+        ),
+        langs = listOf("汉语普通话", "英语", "粤语", "韩语", "日语", "法语", "德语", "西班牙语", "意大利语", "泰语", "其它"),
+        years = CsMacCms.years(27),
+        // by/id (newest added) isn't linked in the site's UI but MacCMS honours it.
+        sorts = listOf("id" to "最新添加", "time" to "最近更新", "hits" to "热播", "score" to "评分"),
+    )
+
+    // Category browsing (shared/CsBrowse.kt): our own category page on CloudStream, the app's own on SkyStream Dev.
+    private val browse = CsBrowse(this, name, site.sections) { id, filters, query, page ->
+        val document = getDocument(site.url(mainUrl, id, filters, query, page))
+        val (current, last) = pageInfo(document)
+        val items = listItems(document).map { it.toSearchResponse(typeForCategory(id)) }
+        items to (current < last && items.isNotEmpty())
+    }
+
+
+    /**
      * Top-level types are 1 电影, 2 电视剧, 3 动漫, 4 综艺 and 11 短剧. 纪录片 is the 电影 subtype 124
      * (labelled 记录片 on the site) and is offered as its own category.
      * Sorts: `by/hits` (人气), `by/id` (newest id = 最新添加, not linked in the UI but honoured by
      * MacCMS) and `by/time` (时间 = last update, the site's default).
      */
-    override val mainPage = listOf(
-        "1" to "电影",
-        "2" to "电视剧",
-        "4" to "综艺",
-        "3" to "动漫",
-        "11" to "短剧",
-        "124" to "纪录片",
-    ).flatMap { (category, label) ->
+    // On CloudStream the "分类 Categories" row comes first (shared/CsBrowse.kt).
+    override val mainPage = browse.mainPage(
         listOf(
-            "hits" to "热播",
-            "id" to "最新添加",
-            "time" to "最近更新",
-        ).map { (order, orderLabel) ->
-            MainPageData("$label · $orderLabel", "$category|$order")
-        }
-    }
+            "1" to "电影",
+            "2" to "电视剧",
+            "4" to "综艺",
+            "3" to "动漫",
+            "11" to "短剧",
+            "124" to "纪录片",
+        ).flatMap { (category, label) ->
+            listOf(
+                "hits" to "热播",
+                "id" to "最新添加",
+                "time" to "最近更新",
+            ).map { (order, orderLabel) ->
+                MainPageData("$label · $orderLabel", "$category|$order")
+            }
+        },
+    )
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val category = request.data.substringBefore('|')
@@ -103,7 +184,11 @@ class XiaobaoProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val encoded = URLEncoder.encode(query.trim(), "UTF-8").replace("+", "%20")
         val document = getDocument("$mainUrl/search/page/${page.coerceAtLeast(1)}/wd/$encoded.html")
@@ -123,16 +208,20 @@ class XiaobaoProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {

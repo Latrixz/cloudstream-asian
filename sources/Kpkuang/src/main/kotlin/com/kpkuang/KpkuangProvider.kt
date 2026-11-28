@@ -4,7 +4,10 @@ import android.util.Base64
 import android.util.Log
 import com.csasian.shared.CsAdStrip
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsMacCms
 import com.csasian.shared.CsQuality
+import com.csasian.shared.CsSearch
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
@@ -17,6 +20,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Interceptor
@@ -60,7 +64,74 @@ class KpkuangProvider : MainAPI() {
     private val jsonMapper = ObjectMapper()
 
     /** Row data: "{path}|{section heading}" — the cards under that heading on that page ("*": every section). */
-    override val mainPage = mainPageOf(
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the site's sub-categories, as its type pages list them.
+     * Only /vodtype/ pages are open (the /vodshow/ 地区 / 年份 filters sit behind Cloudflare): a leaf type
+     * pages through /vodtype/{id}/index-{n}.html, newest first; a parent type without a chosen
+     * sub-category merges its sub-categories' pages. A keyword uses the site's search API, kept to the
+     * section's types (one page).
+     */
+    private val site = CsMacCms.Site(
+        CsMacCms.Custom { "" }, // URLs are built in [browse].
+        types = listOf(
+            CsMacCms.Type(
+                "1", "电影",
+                subtypes = listOf(
+                    "6" to "动作片", "7" to "喜剧片", "8" to "爱情片", "9" to "科幻片", "10" to "恐怖片", "11" to "剧情片",
+                    "12" to "战争片", "29" to "纪录片",
+                ),
+            ),
+            CsMacCms.Type(
+                "2", "剧集",
+                subtypes = listOf(
+                    "13" to "国产剧", "14" to "港剧", "15" to "日剧", "16" to "欧美剧", "23" to "韩剧", "22" to "越南剧",
+                    "21" to "泰剧", "20" to "台剧",
+                ),
+            ),
+            CsMacCms.Type("3", "综艺"),
+            CsMacCms.Type("4", "动漫"),
+            CsMacCms.Type(
+                "37", "短剧",
+                subtypes = listOf(
+                    "36" to "爽文短剧", "39" to "现代都市", "40" to "脑洞悬疑", "41" to "年代穿越", "42" to "古装仙侠",
+                    "43" to "反转爽剧", "44" to "女频恋爱", "45" to "成长逆袭",
+                ),
+            ),
+        ),
+        sorts = emptyList(),
+    )
+
+    private val browse = CsBrowse(this, name, site.sections) { id, filters, query, page ->
+        val type = site.types.first { it.id == id }
+        val chosen = filters[CsMacCms.TYPE]
+        val leaves = when {
+            chosen != null -> listOf(chosen)
+            type.subtypes.isEmpty() -> listOf(id)
+            else -> type.subtypes.map { it.first }
+        }
+        if (query.isNotBlank()) {
+            if (page > 1) return@CsBrowse emptyList<SearchResponse>() to false
+            val wanted = (leaves + if (chosen == null) listOf(id) else emptyList()).mapNotNull { it.toIntOrNull() }.toSet()
+            return@CsBrowse searchHits(query).filter { it.second in wanted }.map { it.first } to false
+        }
+        val parts = coroutineScope {
+            leaves.map { leaf -> async { runCatching { typePage(leaf.toInt(), page) }.getOrNull() } }.awaitAll().filterNotNull()
+        }
+        // Round-robin, so every sub-category shows up near the top.
+        val merged = (0 until (parts.maxOfOrNull { it.first.size } ?: 0)).flatMap { i -> parts.mapNotNull { it.first.getOrNull(i) } }
+        merged.distinctBy { it.url } to parts.any { it.second }
+    }
+
+    /** One page of a leaf type's list (/vodtype/{id}/index-{n}.html) and whether the pager goes on. */
+    private suspend fun typePage(typeId: Int, page: Int): Pair<List<SearchResponse>, Boolean> {
+        val path = if (page <= 1) "/vodtype/$typeId/" else "/vodtype/$typeId/index-$page.html"
+        val document = getPage("$mainUrl$path")
+        val items = document.select("li.fed-list-item").mapNotNull { it.toCard(typeForId(typeId)) }.distinctBy { it.url }
+        val next = document.selectFirst("a[href=/vodtype/$typeId/index-${page + 1}.html]") != null
+        return items to (items.isNotEmpty() && next)
+    }
+
+    override val mainPage = browse.mainPage(listOf(
         "/label/news.html|最近更新" to "最近更新",
         // The movie and series pages show 12 new titles overall, then the 12 newest of each genre.
         "/vodtype/1/|*" to "电影",
@@ -73,11 +144,17 @@ class KpkuangProvider : MainAPI() {
         "/vodtype/3/|综艺" to "综艺",
         "/vodtype/4/|动漫" to "动漫",
         "/vodtype/37/|最新视频" to "短剧",
-    )
+    ).map { (data, label) -> MainPageData(label, data) })
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         // Every list is a single page on this site.
@@ -96,16 +173,47 @@ class KpkuangProvider : MainAPI() {
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
-    override suspend fun search(query: String): List<SearchResponse> {
+    /**
+     * Also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt). The
+     * site's search API allows about one search every 1.5 seconds, so the lookup runs next to our own
+     * search and then only the best two translated titles are searched, one after the other, within
+     * five seconds; our own results come first.
+     */
+    override suspend fun search(query: String): List<SearchResponse> = coroutineScope {
+        val names = async { runCatching { CsSearch.translations(query, lang) }.getOrDefault(emptyList()) }
+        val own = searchHits(query).map { it.first }
+        val extra = withTimeoutOrNull(TRANSLATED_MS) {
+            names.await().take(MAX_TRANSLATED).flatMap { name ->
+                runCatching { searchHits(name) }.getOrDefault(emptyList()).map { it.first }
+                    .sortedByDescending { it.name.trim() == name }
+            }
+        }.orEmpty()
+        (own + extra).distinctBy { it.url }
+    }
+
+    private val searchLock = kotlinx.coroutines.sync.Mutex()
+    @Volatile private var lastSearchAt = 0L
+
+    /**
+     * The site's instant-search hits with their type ids. The API answers code 0 (no results) to
+     * searches close together and then rate-limits, so searches (the translated titles too) go one at a
+     * time, at least [SEARCH_GAP_MS] apart.
+     */
+    private suspend fun searchHits(query: String): List<Pair<SearchResponse, Int>> {
         val keyword = query.trim()
         // The API answers "too short" below 2 Chinese characters / 5 other characters.
         val chinese = keyword.count { it in '一'..'龥' }
         if (chinese < 2 && keyword.length < 5) return emptyList()
         val encoded = URLEncoder.encode(keyword, "UTF-8").replace("+", "%20")
-        val body = app.get(
-            "$SEARCH_API?kw=$encoded&ts=${System.currentTimeMillis()}&callback=cb",
-            headers = pageHeaders,
-        ).text
+        val body = searchLock.withLock {
+            val wait = lastSearchAt + SEARCH_GAP_MS - System.currentTimeMillis()
+            if (wait > 0) delay(wait)
+            try {
+                app.get("$SEARCH_API?kw=$encoded&ts=${System.currentTimeMillis()}&callback=cb", headers = pageHeaders).text
+            } finally {
+                lastSearchAt = System.currentTimeMillis()
+            }
+        }
         val json = body.substringAfter('(', "").substringBeforeLast(')', "").ifBlank { body }
         val root = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyList()
         if (root.path("code").asInt(0) != 1) {
@@ -116,7 +224,9 @@ class KpkuangProvider : MainAPI() {
             String(Base64.decode(root.path("js").asText(""), Base64.DEFAULT), Charsets.UTF_8)
         }.getOrNull() ?: return emptyList()
         val list = runCatching { jsonMapper.readTree(decoded) }.getOrNull() ?: return emptyList()
-        val results = list.mapNotNull { hit -> hit.toSearchResult() }.distinctBy { it.url }
+        val results = list.mapNotNull { hit ->
+            hit.toSearchResult()?.let { it to hit.path("data").path("type_id").asInt(0) }
+        }.distinctBy { it.first.url }
         Log.i(TAG, "search '$keyword': ${results.size}/${list.size()} results")
         return results
     }
@@ -135,16 +245,20 @@ class KpkuangProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     /**
@@ -597,6 +711,9 @@ class KpkuangProvider : MainAPI() {
         private const val TAG = "Kpkuang"
         private const val SEARCH_API = "https://kpdata.flixfiend.top/esearch/index"
         private const val ADULT_TYPE = 26
+        private const val SEARCH_GAP_MS = 1_500L
+        private const val TRANSLATED_MS = 5_000L
+        private const val MAX_TRANSLATED = 2
         private const val ADULT_LABEL = "考驾照"
         private const val MAX_RECOMMENDATIONS = 18
         private const val MAX_PARALLEL = 3

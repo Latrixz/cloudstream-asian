@@ -27,9 +27,17 @@ import java.net.URLEncoder
 object CsMore {
     private const val MARK = "#csmore"
 
+    /**
+     * Only on SkyStream builds that can't page home rows themselves. A SkyStream engine with paging
+     * (github.com/akashdh11/skystream/issues/170) sets the system property cs3engine.homePaging.
+     */
+    private val needed: Boolean by lazy {
+        CsLogos.onSkyStream && System.getProperty("cs3engine.homePaging") != "true"
+    }
+
     /** Adds the "More ›" card to [response] when running on SkyStream and the row has another page. */
     fun wrap(api: MainAPI, request: MainPageRequest, page: Int, response: HomePageResponse): HomePageResponse {
-        if (!CsLogos.onSkyStream || !response.hasNext) return response
+        if (!needed || !response.hasNext) return response
         val lists = response.items.map { list ->
             HomePageList(list.name, list.list + card(api, request, page + 1), list.isHorizontalImages)
         }

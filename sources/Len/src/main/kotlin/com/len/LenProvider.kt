@@ -1,6 +1,9 @@
 package com.len
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsCategories
+import com.csasian.shared.CsSearch
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
@@ -34,10 +37,67 @@ class LenProvider : MainAPI() {
             "Referer" to "$mainUrl/",
         )
 
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the site's own list filters (/type/<media>/... chips):
+     * /api/{movies|tv-series}?type=<slug>&region=&year=&sort=, with the 类型 slugs from /api/categories and
+     * the 地区 / 年份 / 排序 the list pages offer. The list API has no keyword, so a search inside a category
+     * is the site's normal search.
+     */
+    private val browse = CsBrowse(this, name, browseSections(), popularSort = "views") { id, filters, query, page ->
+        if (query.isNotBlank()) return@CsBrowse searchPage(query, page)
+        val params = buildList {
+            add("page=$page")
+            add("pageSize=$LIST_PAGE_SIZE")
+            filters["type"]?.let { add("type=$it") }
+            filters["region"]?.let { add("region=${URLEncoder.encode(it, "UTF-8")}") }
+            filters["year"]?.let { add("year=$it") }
+            filters[CsCategories.SORT]?.takeIf { it != LATEST }?.let { add("sort=$it") }
+        }.joinToString("&")
+        val result = app.get("$api/$id?$params", headers = apiHeaders).parsed<ListApiResponse>()
+        val list = result.data ?: throw ErrorLoadingException(result.error.ifBlank { "列表加载失败" })
+        val items = list.data.map { it.toSearchResponse(id == "movies") }
+        items to (items.isNotEmpty() && page < list.totalPages)
+    }
+
+    private fun browseSections(): List<CsBrowse.Section> {
+        fun opts(vararg pairs: Pair<String, String>) = pairs.map { (v, label) -> CsCategories.Option(v, label) }
+        val regions = listOf("大陆", "香港", "台湾", "美国", "日本", "韩国", "英国", "法国", "德国", "印度", "泰国", "其他")
+            .map { CsCategories.Option(it) }
+        val years = (2026 downTo 2015).map { CsCategories.Option(it.toString()) }
+        // 最新 (the site's default: newest updated first), 最热, 评分.
+        val sorts = opts(LATEST to "最新", "views" to "最热", "rating" to "评分")
+        fun section(id: String, name: String, types: List<CsCategories.Option>) = CsBrowse.Section(
+            id, name,
+            filters = listOf(
+                CsCategories.Filter("type", "类型", types),
+                CsCategories.Filter("region", "地区", regions),
+                CsCategories.Filter("year", "年份", years),
+            ),
+            sorts = sorts,
+        )
+        return listOf(
+            section(
+                "movies", "电影",
+                opts(
+                    "action" to "动作", "comedy" to "喜剧", "drama" to "剧情", "sci-fi" to "科幻", "romance" to "爱情",
+                    "mystery" to "悬疑", "horror" to "恐怖", "animation" to "动画", "war" to "战争",
+                ),
+            ),
+            section(
+                "tv-series", "电视剧",
+                opts(
+                    "chinese-drama" to "国产剧", "american-drama" to "欧美剧", "korean-drama" to "韩剧", "japanese-drama" to "日剧",
+                    "hk-tw-drama" to "港台剧", "thai" to "泰剧", "dongman" to "动漫",
+                ),
+            ),
+        )
+    }
+
     // Category = "<endpoint>:<type slug>". The type slug is the site's own /type/<media>/<slug> filter
     // (empty = the whole media type). Rows mirror the list pages' sort buttons:
     // 最热 (sort=views), 最新 (default, newest updated_at first) and 评分 (sort=rating).
-    override val mainPage = listOf(
+    // On CloudStream the "分类 Categories" row comes first.
+    override val mainPage = browse.mainPage(listOf(
         "movies:" to "电影",
         "tv-series:" to "电视剧",
         "tv-series:chinese-drama" to "国产剧",
@@ -55,11 +115,17 @@ class LenProvider : MainAPI() {
         ).map { (order, orderLabel) ->
             MainPageData("$label · $orderLabel", "$category:$order")
         }
-    }
+    })
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val parts = request.data.split(':')
@@ -82,10 +148,11 @@ class LenProvider : MainAPI() {
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
-    override suspend fun search(query: String): List<SearchResponse> = searchPage(query, 1).first
+    override suspend fun search(query: String): List<SearchResponse> = search(query, 1).items
 
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
     override suspend fun search(query: String, page: Int): SearchResponseList {
-        val (results, hasNext) = searchPage(query, page)
+        val (results, hasNext) = CsSearch.withExtra(query, page, lang) { q, p -> searchPage(q, p) }
         return newSearchResponseList(results, hasNext)
     }
 
@@ -115,16 +182,20 @@ class LenProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {
@@ -361,6 +432,8 @@ class LenProvider : MainAPI() {
     companion object {
         // The list API caps page at 1000, so 60 per page is needed to reach the end of the movie catalogue.
         private const val LIST_PAGE_SIZE = 60
+        /** The 最新 sort: the list API's default order, so no sort parameter. */
+        private const val LATEST = "latest"
         private const val SEARCH_PAGE_SIZE = 24
         private const val MAX_RECOMMENDATIONS = 16
         private const val ANIMATION_MOVIE_CATEGORY = 8

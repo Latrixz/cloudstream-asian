@@ -17,7 +17,7 @@ import urllib.request
 
 # Friendly names as shown in CloudStream (plugins.json only has the module names).
 NAMES = {
-    "Olevod": "欧乐影院 Olevod", "Kubb": "酷播 Kubb", "Mvffm": "Movieffm", "Len": "冷映 Len",
+    "Olevod": "欧乐影院 Olevod", "Kubb": "酷播 Kubb", "Uvod": "优视频 UVOD", "Mvffm": "Movieffm", "Len": "冷映 Len",
     "Huavod": "华视影院 Huavod", "Ddys": "低端影视 Ddys", "Duboku": "独播库 Duboku", "Xiaobao": "小宝影院 Xiaobao",
     "Kissasian": "Kissasian", "Crackle": "Crackle", "Flixvision": "FlixVision", "Framextv": "FrameXTV",
     "Rivestream": "Rivestream", "Rivo": "Rivo", "Movy": "Movy",

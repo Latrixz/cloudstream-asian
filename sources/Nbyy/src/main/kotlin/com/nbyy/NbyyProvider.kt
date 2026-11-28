@@ -1,7 +1,10 @@
 package com.nbyy
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsCategories
 import com.csasian.shared.CsQuality
+import com.csasian.shared.CsSearch
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -64,11 +67,44 @@ class NbyyProvider : MainAPI() {
         Row("动漫", "channel=anime", TvType.Anime),
     )
 
-    override val mainPage = rows.map { MainPageData(it.label, it.query) }
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the site's own filter page:
+     * /filter.html?channel={c}&region={r}&showtype={genre}&year={y}&page={n}, options as listed there
+     * (地区 / 类型 / 年份). The page has no sort (newest first) and no keyword, so a search inside a
+     * category is the site's normal search.
+     */
+    private val browse = CsBrowse(this, name, BROWSE_SECTIONS) { id, filters, query, page ->
+        if (query.isNotBlank()) return@CsBrowse searchOwn(query, page)
+        val params = listOfNotNull(
+            "channel=$id",
+            filters["region"]?.let { "region=${enc(it)}" },
+            filters["showtype"]?.let { "showtype=${enc(it)}" },
+            filters["year"]?.let { "year=${enc(it)}" },
+            "page=$page",
+        ).joinToString("&")
+        val type = when (id) {
+            "movie" -> TvType.Movie
+            "anime" -> TvType.Anime
+            else -> TvType.TvSeries
+        }
+        val items = cards(getPage("$mainUrl/filter.html?$params")) { type }
+        items to (items.size >= PAGE_SIZE)
+    }
+
+    // On CloudStream the "分类 Categories" row comes first.
+    override val mainPage = browse.mainPage(rows.map { MainPageData(it.label, it.query) })
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
+
+    private fun enc(text: String) = URLEncoder.encode(text, "UTF-8").replace("+", "%20")
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val type = rows.firstOrNull { it.query == request.data }?.type ?: TvType.TvSeries
@@ -86,7 +122,11 @@ class NbyyProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val encoded = URLEncoder.encode(query.trim(), "UTF-8").replace("+", "%20")
         val document = getPage("$mainUrl/search.html?keyword=$encoded&page=$page")
@@ -95,16 +135,20 @@ class NbyyProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {
@@ -304,6 +348,60 @@ class NbyyProvider : MainAPI() {
 
     companion object {
         private const val PAGE_SIZE = 48
+
+        private fun opts(vararg pairs: Pair<String, String>) = pairs.map { (v, label) -> CsCategories.Option(v, label) }
+
+        /** 地区 from /filter.html (the same for every channel). */
+        private val REGIONS = opts(
+            "cn" to "大陆", "hk" to "香港", "tw" to "台湾", "jp" to "日本", "kr" to "韩国", "west" to "欧美",
+            "th" to "泰国", "sg-my-th" to "新马泰", "other" to "其它",
+        )
+
+        private val RECENT_YEARS = (2026 downTo 2015).map { it.toString() to it.toString() }.toTypedArray()
+
+        /** The channels and their 类型 / 年份 lists as /filter.html shows them. */
+        private val BROWSE_SECTIONS = listOf(
+            "movie" to "电影" to opts(
+                "mao-xian" to "冒险", "ju-qing" to "剧情", "dong-zuo" to "动作", "dong-hua" to "动画电影", "tong-xing" to "同性",
+                "xi-ju" to "喜剧", "qi-huan" to "奇幻", "kong-bu" to "恐怖", "xuan-yi" to "悬疑", "jing-xiong" to "惊悚",
+                "zhan-zheng" to "战争", "ge-wu" to "歌舞", "zhai-nan" to "灾难", "ai-qing" to "爱情", "fan-zui" to "犯罪",
+                "ke-huan" to "科幻", "jing-dian" to "经典", "wang-luo" to "网络电影",
+            ),
+            "tv" to "电视剧" to opts(
+                "ou-xiang" to "偶像", "jun-lv" to "军旅", "ju-qing" to "剧情", "dong-zuo" to "动作", "li-shi" to "历史",
+                "mao-xian" to "历险", "gu-zhuang" to "古装", "tong-xing" to "同性", "shang-zhan" to "商战", "xi-ju" to "喜剧",
+                "qi-huan" to "奇幻", "gong-ting" to "宫廷", "jia-ting" to "家庭", "xuan-yi" to "悬疑", "jing-song" to "惊悚",
+                "zhan-zheng" to "战争", "wu-xia" to "武侠", "jiang-hu" to "江湖", "ai-qing" to "爱情", "xuan-huan" to "玄幻",
+                "shen-hua" to "神话", "ke-huan" to "科幻", "chuan-yue" to "穿越", "zui-an" to "罪案", "yan-qing" to "言情",
+                "jing-fei" to "警匪", "die-zhan" to "谍战", "du-shi" to "都市", "qing-chun" to "青春",
+            ),
+            "show" to "综艺" to opts(
+                "qing-gan" to "情感", "gao-xiao" to "搞笑", "wan-hui" to "晚会", "yan-chang-hui" to "演唱会", "yin-yue" to "音乐",
+                "zhen-ren-xiu" to "真人秀", "mei-shi" to "美食", "jing-ji" to "竞技", "wang-zong" to "网综", "tuo-kou-xiu" to "脱口秀",
+                "fang-tan" to "访谈", "xuan-xiu" to "选秀", "other" to "其它",
+            ),
+            "anime" to "动漫" to opts(
+                "mao-xian" to "冒险", "movie" to "动画电影", "shao-nv" to "少女", "lian-ai" to "恋爱", "tui-li" to "推理",
+                "ji-zhan" to "机战", "xiao-yuan" to "校园", "ge-dou" to "格斗", "zhi-yu" to "治愈", "pao-mian" to "泡面",
+                "ling-yi" to "灵异", "re-xue" to "热血", "bao-xiao" to "爆笑", "ke-huan" to "科幻", "chuan-yue" to "穿越",
+                "jing-ji" to "竞技", "dan-mei" to "耽美", "mo-huan" to "魔幻", "other" to "其它",
+            ),
+        ).map { (section, genres) ->
+            val (id, label) = section
+            // Movies list single years back to 2015; the other channels also offer decades.
+            val years = opts(*RECENT_YEARS) + if (id == "movie") opts("lt__2015" to "更早") else opts(
+                "2014-2011" to "2014-2011", "2010-2000" to "2010-2000", "1999-1990" to "90年代",
+                "1989-1980" to "80年代", "1979-0" to "更早",
+            )
+            CsBrowse.Section(
+                id, label,
+                filters = listOf(
+                    CsCategories.Filter("showtype", "类型", genres),
+                    CsCategories.Filter("region", "地区", REGIONS),
+                    CsCategories.Filter("year", "年份", years),
+                ),
+            )
+        }
         private const val MAX_RECOMMENDATIONS = 18
         private const val PROBE_TIMEOUT_MS = 5000L
 

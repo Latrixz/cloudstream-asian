@@ -2,8 +2,11 @@ package com.dramafren
 
 import android.util.Log
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsCategories
 import com.csasian.shared.CsLogos
 import com.csasian.shared.CsMore
+import com.csasian.shared.CsSearch
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
@@ -55,17 +58,68 @@ class DramafrenProvider : MainAPI() {
     private val mapper = ObjectMapper()
     private val headers = mapOf("User-Agent" to USER_AGENT)
 
-    override val mainPage = listOfNotNull(
-        MainPageData("Latest Chinese dramas", ROW_LATEST),
-        MainPageData("More new Chinese dramas", ROW_MORE),
-        // "Popular" left out: it is almost all older titles whose mirrors are dead (1 of 16 played).
-        MainPageData("DramaBox (English)", ROW_DRAMABOX),
-        MainPageData("More DramaBox (English)", ROW_DRAMABOX_MORE),
+    /**
+     * Category browsing (shared/CsBrowse.kt): "Chinese dramas" from the site's advanced search, with its
+     * status filter (none chosen = all) and its orders, latest first; and "DramaBox", the English
+     * catalogue in its own order. A search in "Chinese dramas" is the site's search (it can't be narrowed
+     * by status); in "DramaBox" it filters the catalogue.
+     */
+    private val browse = CsBrowse(
+        this, name,
+        listOf(
+            CsBrowse.Section(
+                SECTION_CHINESE, "Chinese dramas", english = "Chinese dramas", glyph = "🀄",
+                filters = listOf(
+                    CsCategories.Filter(STATUS, "Status", listOf(CsCategories.Option("completed", "Completed"), CsCategories.Option("ongoing", "Ongoing"))),
+                ),
+                sorts = listOf(
+                    CsCategories.Option("latest", "Latest"), CsCategories.Option("added", "Release date"),
+                    CsCategories.Option("popular", "Most viewed"), CsCategories.Option("title", "Name"),
+                ),
+            ),
+            CsBrowse.Section(SECTION_DRAMABOX, "DramaBox", english = "DramaBox", glyph = "📱"),
+        ),
+        popularSort = "popular",
+    ) { id, filters, query, page ->
+        when {
+            id == SECTION_DRAMABOX && query.isNotBlank() ->
+                (if (page <= 1) searchCatalogue(query).map { it.toSearchResult() } else emptyList()) to false
+            id == SECTION_DRAMABOX -> catalogPages(page, 0)
+            query.isNotBlank() -> searchSite(query, page)
+            else -> {
+                val url = buildString {
+                    append(mainUrl).append("/advanced-search/")
+                    if (page > 1) append("page/").append(page).append('/')
+                    append("?type%5B0%5D=series")
+                    filters[STATUS]?.let { append("&status%5B0%5D=").append(it) }
+                    append("&order=").append(filters[CsCategories.SORT] ?: "latest")
+                }
+                sitePages(listOf(page)) { url }
+            }
+        }
+    }
+
+    // On CloudStream the "分类 Categories" row comes first.
+    override val mainPage = browse.mainPage(
+        listOfNotNull(
+            MainPageData("Latest Chinese dramas", ROW_LATEST),
+            MainPageData("More new Chinese dramas", ROW_MORE),
+            // "Popular" left out: it is almost all older titles whose mirrors are dead (1 of 16 played).
+            MainPageData("DramaBox (English)", ROW_DRAMABOX),
+            MainPageData("More DramaBox (English)", ROW_DRAMABOX_MORE),
+        ),
     )
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     // ---- home ----
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        browse.rowPage(request)?.let { return it }
         val (items, hasNext) = when (request.data) {
             // 4 site pages (40 titles) per row page: SkyStream only asks for more once its grid scrolls.
             // SkyStream never asks for page 2 itself; there the row ends with a "More ›" card (CsMore).
@@ -123,22 +177,31 @@ class DramafrenProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> = search(query, 1)?.items.orEmpty()
 
+    // Page 1 also searches the title in English when it was typed in another language (shared/CsSearch.kt).
     override suspend fun search(query: String, page: Int): SearchResponseList? {
+        val (items, hasNext) = CsSearch.withExtra(query, page, "en") { q, p -> searchOwn(q, p) }
+        return newSearchResponseList(items, hasNext)
+    }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         val q = query.trim()
-        if (q.isEmpty()) return newSearchResponseList(emptyList(), false)
+        if (q.isEmpty()) return emptyList<SearchResponse>() to false
         return coroutineScope {
-            val site = async {
-                val url = if (page <= 1) "$mainUrl/?s=${enc(q)}" else "$mainUrl/page/$page/?s=${enc(q)}"
-                runCatching { page(url) }.onFailure { Log.w(TAG, "search '$q' page $page: ${it.message}") }.getOrNull()
-            }
+            val site = async { searchSite(q, page) }
             // DramaBox titles come first on page 1 only (they're all filtered at once).
             val box = if (page <= 1) async { searchCatalogue(q) } else null
-            val doc = site.await()
-            val chinese = doc?.let { cards(it) }.orEmpty()
+            val (chinese, hasNext) = site.await()
             val dramabox = box?.await().orEmpty()
             Log.i(TAG, "search '$q' page $page: ${chinese.size} Chinese, ${dramabox.size} DramaBox")
-            newSearchResponseList(dramabox.map { it.toSearchResult() } + chinese, doc?.selectFirst("a.next.page-numbers") != null)
+            (dramabox.map { it.toSearchResult() } + chinese) to hasNext
         }
+    }
+
+    /** The site's own search (Chinese dramas): one page of cards, and whether another follows. */
+    private suspend fun searchSite(q: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+        val url = if (page <= 1) "$mainUrl/?s=${enc(q)}" else "$mainUrl/page/$page/?s=${enc(q)}"
+        val doc = runCatching { page(url) }.onFailure { Log.w(TAG, "search '$q' page $page: ${it.message}") }.getOrNull()
+        return doc?.let { cards(it) }.orEmpty() to (doc?.selectFirst("a.next.page-numbers") != null)
     }
 
     // ---- DramaBox catalogue ----
@@ -205,16 +268,20 @@ class DramafrenProvider : MainAPI() {
     // ---- title page ----
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = if (CsMore.isMore(data)) false else CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return if (CsMore.isMore(data)) false else CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {
@@ -710,6 +777,9 @@ class DramafrenProvider : MainAPI() {
         private const val ROW_DRAMABOX_MORE = "dramabox-more"
         private const val ROW_POPULAR = "popular"
         private const val ROW_DRAMABOX = "dramabox"
+        private const val SECTION_CHINESE = "chinese"
+        private const val SECTION_DRAMABOX = "dramabox"
+        private const val STATUS = "status"
         private const val USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
         private const val DIGITS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

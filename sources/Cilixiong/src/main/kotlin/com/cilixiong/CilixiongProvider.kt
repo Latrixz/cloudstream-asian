@@ -3,6 +3,9 @@ package com.cilixiong
 import android.util.Log
 import com.csasian.shared.CsAdStrip
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsCategories
+import com.csasian.shared.CsSearch
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -39,8 +42,45 @@ class CilixiongProvider : MainAPI() {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
     private val pageHeaders get() = mapOf("User-Agent" to userAgent, "Referer" to "$mainUrl/")
 
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the site's filter pages /{1 movie|2 drama}-{genre}-{region}-{page-1}.html
+     * (类型 and 地区 ids as the site lists them; its 情色 genre is left out), plus the 豆瓣 and IMDb Top250
+     * lists. The site has one order only, newest added first. A search inside 电影 or 剧集 is the site's
+     * search limited to that class; inside a Top250 list, the site's whole search.
+     */
+    private val browse = CsBrowse(this, name, browseSections()) { id, filters, query, page ->
+        if (query.isNotBlank()) return@CsBrowse searchOwn(query, page, id.takeIf { it == "1" || it == "2" } ?: "1,2")
+        val url = if (id.endsWith("/")) {
+            if (page <= 1) "$mainUrl/$id" else "$mainUrl/${id}index_$page.html"
+        } else {
+            "$mainUrl/$id-${filters["genre"] ?: "0"}-${filters["region"] ?: "0"}-${page - 1}.html"
+        }
+        val document = app.get(url, headers = pageHeaders).document
+        val items = cards(document)
+        items to (items.isNotEmpty() && hasNextPage(document))
+    }
+
+    private fun browseSections(): List<CsBrowse.Section> {
+        val genres = listOf(
+            "剧情", "喜剧", "惊悚", "动作", "爱情", "犯罪", "恐怖", "冒险", "悬疑", "科幻", "家庭", "奇幻", "动画", "战争",
+            "历史", "传记", "音乐", "歌舞", "运动", "西部", "灾难", "古装", "情色", "同性", "儿童", "纪录片",
+        ).mapIndexedNotNull { i, label -> if (label == "情色") null else CsCategories.Option((i + 1).toString(), label) }
+        val regions = listOf(
+            "大陆", "香港", "台湾", "美国", "日本", "韩国", "英国", "法国", "德国", "印度", "泰国", "丹麦", "瑞典", "巴西",
+            "加拿大", "俄罗斯", "意大利", "比利时", "爱尔兰", "西班牙", "澳大利亚", "波兰", "土耳其", "越南",
+        ).mapIndexed { i, label -> CsCategories.Option((i + 1).toString(), label) }
+        val filters = listOf(CsCategories.Filter("genre", "类型", genres), CsCategories.Filter("region", "地区", regions))
+        return listOf(
+            CsBrowse.Section("1", "电影", filters),
+            CsBrowse.Section("2", "剧集", filters, english = "TV Series"),
+            CsBrowse.Section("top250/", "豆瓣 Top250", english = "Douban Top 250", glyph = "🏆", slug = "douban-top250"),
+            CsBrowse.Section("s/imdbtop250/", "IMDb Top250", english = "IMDb Top 250", glyph = "🏆", slug = "imdb-top250"),
+        )
+    }
+
     // data = list path ("movie/", "top250/", ...) or a filter prefix ("1-0-6" = Korean movies).
-    override val mainPage = mainPageOf(
+    // On CloudStream the "分类 Categories" row comes first.
+    override val mainPage = browse.mainPage(mainPageOf(
         "movie/" to "最新电影",
         "drama/" to "最新剧集",
         "top250/" to "豆瓣电影 Top250",
@@ -52,11 +92,17 @@ class CilixiongProvider : MainAPI() {
         "2-0-6" to "韩剧",
         "2-0-5" to "日剧",
         "2-0-4" to "美剧",
-    )
+    ))
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val path = request.data
@@ -78,13 +124,18 @@ class CilixiongProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    /** The site's search; [classId] "1" movies, "2" series, "1,2" both. */
+    private suspend fun searchOwn(query: String, page: Int, classId: String = "1,2"): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         // The site gives the same searchid for the same keyword, so posting again for page n is cheap.
         val first = app.post(
             "$mainUrl/e/search/index.php",
             headers = pageHeaders,
-            data = mapOf("keyboard" to query.trim(), "show" to "title", "classid" to "1,2", "tempid" to "1"),
+            data = mapOf("keyboard" to query.trim(), "show" to "title", "classid" to classId, "tempid" to "1"),
         )
         val document = if (page <= 1) {
             first.document
@@ -99,15 +150,20 @@ class CilixiongProvider : MainAPI() {
     }
 
     // Remembers the streamable episodes and adds backup links from our other sources (see shared/CsBackup.kt).
-    override suspend fun load(url: String): LoadResponse = loadPage(url).also { CsBackup.remember(this, backupView(it)) }
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
+    override suspend fun load(url: String): LoadResponse =
+        browse.load(url) ?: loadPage(url).also { CsBackup.remember(this, backupView(it)) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     /** Strips the ad clips spliced into the ffzy / lz-cdn playlists. */

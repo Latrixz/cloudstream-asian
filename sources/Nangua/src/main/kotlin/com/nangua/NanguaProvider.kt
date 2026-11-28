@@ -3,7 +3,10 @@ package com.nangua
 import android.util.Log
 import com.csasian.shared.CsAdStrip
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsCategories
 import com.csasian.shared.CsQuality
+import com.csasian.shared.CsSearch
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -61,19 +64,79 @@ class NanguaProvider : MainAPI() {
         Channel("doc", "纪录片"),
     )
 
-    // 热播推荐 (the home page's hero + 热播 rankings), then per channel the site's default order
-    // (pinned, then most watched) and the newest updates.
-    override val mainPage = listOf(MainPageData("热播推荐", HOME_ROW)) +
-        channels.flatMap { channel ->
-            listOf(
-                MainPageData("热门${channel.label}", "${channel.key}|all"),
-                MainPageData("最新${channel.label}", "${channel.key}|new"),
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the site's own channel filters (its Category page):
+     * /api/channel/{key}?catalog=1&region=&language=&year=&sort=: 地区 / 语言 / 年份, sorts 最新 / 最热 / 评分 / 综合.
+     * (Its 类型 per channel come from /api/catalog/types, which did not answer when this was written.) The channel list has no keyword, so a
+     * search inside a category is the site's search, keeping that channel's titles.
+     */
+    private val browse = CsBrowse(this, name, browseSections(), popularSort = "hot") { id, filters, query, page ->
+        if (query.isNotBlank()) {
+            val (items, hasNext) = searchOwn(query, page, id)
+            return@CsBrowse items to hasNext
+        }
+        val params = buildString {
+            append("catalog=1&page=$page&size=$PAGE_SIZE&sort=").append(filters[CsCategories.SORT] ?: "new")
+            listOf("region", "language", "year").forEach { key ->
+                filters[key]?.let { append('&').append(key).append('=').append(enc(it)) }
+            }
+        }
+        val data = api("/channel/$id?$params")
+        val list = data.path("list").toList()
+        list.filter { playable(it) }.map { it.toSearchResult() } to
+            (list.isNotEmpty() && page * PAGE_SIZE < data.path("total").asInt(0))
+    }
+
+    private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
+
+    private fun browseSections(): List<CsBrowse.Section> {
+        fun opts(vararg labels: String) = labels.map { CsCategories.Option(it) }
+        val regions = opts(
+            "大陆", "香港", "台湾", "美国", "日本", "韩国", "英国", "法国", "德国", "印度", "泰国", "丹麦", "瑞典", "巴西", "加拿大",
+            "俄罗斯", "意大利", "比利时", "爱尔兰", "西班牙", "澳大利亚", "其他",
+        )
+        val languages = opts("国语", "粤语", "英语", "日语", "韩语", "法语", "其他")
+        val now = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        val years = (now downTo 2020).map { CsCategories.Option(it.toString()) } + listOf(
+            CsCategories.Option("2010s", "10年代"), CsCategories.Option("2000s", "00年代"), CsCategories.Option("1990s", "90年代"),
+            CsCategories.Option("1980s", "80年代"), CsCategories.Option("earlier", "更早"),
+        )
+        // The site's sorts, newest first (its default on the category page).
+        val sorts = listOf("new" to "最新", "hot" to "最热", "rating" to "评分", "all" to "综合").map { CsCategories.Option(it.first, it.second) }
+        return channels.map { channel ->
+            CsBrowse.Section(
+                channel.key, channel.label,
+                filters = listOf(
+                    CsCategories.Filter("region", "地区", regions),
+                    CsCategories.Filter("language", "语言", languages),
+                    CsCategories.Filter("year", "年份", years),
+                ),
+                sorts = sorts,
             )
         }
+    }
+
+    // 热播推荐 (the home page's hero + 热播 rankings), then per channel the site's default order
+    // (pinned, then most watched) and the newest updates. On CloudStream the "分类 Categories" row comes first.
+    override val mainPage = browse.mainPage(
+        listOf(MainPageData("热播推荐", HOME_ROW)) +
+            channels.flatMap { channel ->
+                listOf(
+                    MainPageData("热门${channel.label}", "${channel.key}|all"),
+                    MainPageData("最新${channel.label}", "${channel.key}|new"),
+                )
+            },
+    )
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         if (request.data == HOME_ROW) {
@@ -105,27 +168,37 @@ class NanguaProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    /** The site's search; with [channel], only that channel's titles. */
+    private suspend fun searchOwn(query: String, page: Int, channel: String? = null): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val encoded = URLEncoder.encode(query.trim(), "UTF-8").replace("+", "%20")
         val data = api("/search?q=$encoded&page=$page&size=$PAGE_SIZE")
         val list = data.path("list").toList()
-        val results = list.filter { playable(it) }.map { it.toSearchResult() }
+        val results = list.filter { playable(it) && (channel == null || it.path("channel").asText("") == channel) }
+            .map { it.toSearchResult() }
         Log.i(TAG, "search '$query' page $page: ${results.size}/${list.size} cards parsed")
         return results to (list.isNotEmpty() && page * PAGE_SIZE < data.path("total").asInt(0))
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     /** Strips the ad clips dytt / ffzy splice into their playlists; clean playlists pass unchanged. */

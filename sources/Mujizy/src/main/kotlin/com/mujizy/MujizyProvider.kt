@@ -3,7 +3,10 @@ package com.mujizy
 import android.util.Log
 import com.csasian.shared.CsAdStrip
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsMacCms
 import com.csasian.shared.CsQuality
+import com.csasian.shared.CsSearch
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
@@ -52,33 +55,81 @@ class MujizyProvider : MainAPI() {
     private val apiHeaders get() = mapOf("User-Agent" to userAgent, "Accept" to "application/json")
     private val jsonMapper = ObjectMapper()
 
-    override val mainPage = listOf(
-        MainPageData("最新更新", ROW_LATEST),
-        MainPageData("电影", "$MOVIE"),
-        MainPageData("电视剧", ROW_SERIES),
-        MainPageData("综艺", "$VARIETY"),
-        MainPageData("动漫", "$ANIME"),
-        MainPageData("短剧", "$SHORT_DRAMA"),
+    /**
+     * The feed's own class list (ac=list): each parent type with its sub-categories as the one filter.
+     * The API takes only a type (t) and a keyword (wd) and lists newest first, so there is no other
+     * filter or sort.
+     */
+    private val site = CsMacCms.Site(
+        CsMacCms.Custom { "" }, // The API query is built in [browse].
+        types = listOf(
+            CsMacCms.Type(
+                "$MOVIE", "电影",
+                subtypes = listOf(
+                    "6" to "动作", "23" to "悬疑", "7" to "喜剧", "8" to "爱情", "9" to "科幻", "10" to "恐怖",
+                    "11" to "剧情", "12" to "战争", "20" to "灾难", "39" to "动画",
+                ),
+            ),
+            CsMacCms.Type(
+                "$SERIES", "电视剧",
+                subtypes = listOf("13" to "陆剧", "14" to "美剧", "15" to "韩剧", "16" to "日剧", "17" to "港剧", "18" to "台剧", "19" to "泰剧"),
+            ),
+            CsMacCms.Type(
+                "$VARIETY", "综艺",
+                subtypes = listOf("25" to "国综", "60" to "台综", "26" to "韩综", "27" to "港综", "28" to "美综", "55" to "日综"),
+            ),
+            CsMacCms.Type("$ANIME", "动漫", subtypes = listOf("29" to "国创", "30" to "日漫", "61" to "儿童", "31" to "韩漫", "44" to "美漫")),
+            CsMacCms.Type("$SHORT_DRAMA", "短剧", subtypes = listOf("62" to "古装仙侠", "63" to "年代穿越", "64" to "脑洞悬疑", "69" to "现代都市")),
+        ),
+        sorts = emptyList(),
+    )
+
+    // Category browsing (shared/CsBrowse.kt): our own category page on CloudStream, the app's own on SkyStream Dev.
+    // 电视剧 without a sub-category is the real drama sub-categories merged, as in its home row (t=2 is
+    // mostly 短剧, which is its own section).
+    private val browse = CsBrowse(this, name, site.sections) { id, filters, query, page ->
+        val params = site.params(id, filters, query, page)
+        val wd = params["wd"]?.let { "&wd=" + URLEncoder.encode(it, "UTF-8") }.orEmpty()
+        if (params["id"] == "$SERIES") seriesListing(page, wd)
+        else listing("ac=detail&t=${params["id"]}&pg=$page$wd").let { (list, next) -> list.map { it.first } to next }
+    }
+
+    override val mainPage = browse.mainPage(
+        listOf(
+            MainPageData("最新更新", ROW_LATEST),
+            MainPageData("电影", "$MOVIE"),
+            MainPageData("电视剧", ROW_SERIES),
+            MainPageData("综艺", "$VARIETY"),
+            MainPageData("动漫", "$ANIME"),
+            MainPageData("短剧", "$SHORT_DRAMA"),
+        ),
     )
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
+
+    /** The drama sub-categories (not 短剧) merged, newest first; [extra] is added to each API query. */
+    private suspend fun seriesListing(page: Int, extra: String = ""): Pair<List<SearchResponse>, Boolean> = coroutineScope {
+        SERIES_TYPES.map { t -> async { runCatching { listing("ac=detail&t=$t&pg=$page&pagesize=$SERIES_PAGE$extra") }.getOrNull() } }
+            .awaitAll().filterNotNull()
+            .let { parts -> parts.flatMap { it.first }.sortedByDescending { it.second }.map { it.first } to parts.any { it.second } }
+    }
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val (items, hasNext) = when (request.data) {
-            ROW_LATEST -> listing("ac=detail&pg=$page")
+            ROW_LATEST -> listing("ac=detail&pg=$page").let { (list, next) -> list.map { it.first } to next }
             // The 电视剧 parent (t=2) is mostly 短剧, which has its own row: merge the real drama
             // sub-categories instead, newest first.
-            ROW_SERIES -> coroutineScope {
-                SERIES_TYPES.map { t -> async { runCatching { listing("ac=detail&t=$t&pg=$page&pagesize=$SERIES_PAGE") }.getOrNull() } }
-                    .awaitAll().filterNotNull()
-                    .let { parts ->
-                        parts.flatMap { it.first }.sortedByDescending { it.second } to parts.any { it.second }
-                    }
-            }
-            else -> listing("ac=detail&t=${request.data}&pg=$page")
-        }.let { (list, next) -> list.map { it.first } to next }
+            ROW_SERIES -> seriesListing(page)
+            else -> listing("ac=detail&t=${request.data}&pg=$page").let { (list, next) -> list.map { it.first } to next }
+        }
         Log.i(TAG, "row '${request.name}' page $page: ${items.size} cards, next=$hasNext")
         return newHomePageResponse(request.name, items, hasNext)
     }
@@ -92,7 +143,11 @@ class MujizyProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val encoded = URLEncoder.encode(query.trim(), "UTF-8")
         val (items, hasNext) = listing("ac=detail&wd=$encoded&pg=$page")
@@ -101,16 +156,20 @@ class MujizyProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     /** The mjzy playlists are clean; CsAdStrip leaves such playlists unchanged. */

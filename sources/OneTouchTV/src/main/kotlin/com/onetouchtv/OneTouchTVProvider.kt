@@ -1,5 +1,8 @@
 package com.onetouchtv
 
+import com.csasian.shared.CsSearch
+import com.csasian.shared.CsCategories
+import com.csasian.shared.CsBrowse
 import com.csasian.shared.CsBackup
 
 import com.fasterxml.jackson.databind.JsonNode
@@ -51,19 +54,75 @@ class OneTouchTVProvider : MainAPI() {
         "filipino" to "Filipino",
     )
 
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the API's own filter list (vod/filter): its three types
+     * as sections, country, genre and year. It lists newest first and has no other sort. A search inside a
+     * section is the site's search (it has no filters), kept to that section's type.
+     */
+    private val browse = CsBrowse(
+        this, name,
+        listOf(
+            CsBrowse.Section("drama", "亚洲剧", ottFilters(), english = "Asian Dramas", glyph = "📺"),
+            CsBrowse.Section("movie", "电影", ottFilters(), english = "Movies", glyph = "🎬"),
+            CsBrowse.Section("tv show", "综艺", ottFilters(), english = "TV Shows", glyph = "🎤"),
+        ),
+    ) { id, filters, query, page ->
+        if (query.isNotBlank()) {
+            val found = searchPage(query, page)
+            val type = typeOf(id)
+            return@CsBrowse found.filter { it.type == type } to (found.size >= PAGE_SIZE)
+        }
+        val path = buildString {
+            append("vod/filter?type=").append(URLEncoder.encode(id, "UTF-8").replace("+", "%20"))
+            filters["country"]?.let { append("&country=").append(URLEncoder.encode(it, "UTF-8").replace("+", "%20")) }
+            filters["genre"]?.let { append("&genre=").append(URLEncoder.encode(it, "UTF-8").replace("+", "%20")) }
+            filters["year"]?.let { append("&year=").append(it) }
+            append("&page=").append(page)
+        }
+        // An option with no titles answers 404.
+        val items = runCatching { toResults(api(path).path("result")) }.getOrDefault(emptyList())
+        items to (items.size >= PAGE_SIZE)
+    }
+
+    private fun ottFilters() = listOf(
+        CsCategories.Filter(
+            "country", "地区 Country",
+            listOf(
+                "korean" to "Korea", "chinese" to "China", "japanese" to "Japan", "thai" to "Thailand",
+                "taiwanese" to "Taiwan", "hong kong" to "Hong Kong", "filipino" to "Philippines",
+            ).map { (value, label) -> CsCategories.Option(value, label) },
+        ),
+        CsCategories.Filter(
+            "genre", "类型 Genre",
+            listOf(
+                "action", "adventure", "business", "comedy", "crime", "drama", "family", "fantasy", "food", "historical",
+                "horror", "law", "life", "martial arts", "medical", "melodrama", "military", "music", "mystery", "political",
+                "psychological", "romance", "sci-fi", "sitcom", "sports", "supernatural", "thriller", "tragedy", "war",
+                "wuxia", "youth",
+            ).map { g -> CsCategories.Option(g, g.split(' ').joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }) },
+        ),
+        CsCategories.Filter("year", "年份 Year", CsBrowse.years(20)),
+    )
+
     // data: "home|<key>" and "top|<period>" are single pages; everything else is a paged API path.
-    override val mainPage = mainPageOf(
+    override val mainPage = browse.mainPage(mainPageOf(
         "home|randomSlideShow" to "Featured",
         "home|recents" to "Recently Updated",
         "vod/popular?" to "Popular",
         "vod/movie?" to "Newest Movies",
         "top|day" to "Top Today",
         "top|week" to "Top This Week",
-    ) + countries.map { (key, label) -> MainPageData("$label Dramas & Movies", "vod/filter?country=$key&") }
+    ) + countries.map { (key, label) -> MainPageData("$label Dramas & Movies", "vod/filter?country=$key&") })
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val data = request.data
@@ -79,12 +138,16 @@ class OneTouchTVProvider : MainAPI() {
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
-    override suspend fun search(query: String): List<SearchResponse> = searchPage(query, 1)
+    override suspend fun search(query: String): List<SearchResponse> = searchWithExtra(query, 1).first
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
-        val results = searchPage(query, page)
-        return newSearchResponseList(results, results.size >= PAGE_SIZE)
+        val (results, hasNext) = searchWithExtra(query, page)
+        return newSearchResponseList(results, hasNext)
     }
+
+    // Page 1 also searches the English title when the query is in another language (shared/CsSearch.kt).
+    private suspend fun searchWithExtra(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchPage(q, p).let { it to (it.size >= PAGE_SIZE) } }
 
     private suspend fun searchPage(query: String, page: Int): List<SearchResponse> {
         if (query.isBlank()) return emptyList()
@@ -94,16 +157,20 @@ class OneTouchTVProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {

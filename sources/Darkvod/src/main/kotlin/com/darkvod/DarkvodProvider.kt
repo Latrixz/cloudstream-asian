@@ -3,6 +3,9 @@ package com.darkvod
 import android.util.Log
 import com.csasian.shared.CsAdStrip
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsMacCms
+import com.csasian.shared.CsSearch
 import com.csasian.shared.CsQuality
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
@@ -77,10 +80,90 @@ class DarkvodProvider : MainAPI() {
         "古装仙侠" to TvType.AsianDrama, "女频恋爱" to TvType.AsianDrama,
     )
 
+    /**
+     * The site's own filters (/video/{slug}/area/{a}/by/{by}/lang/{l}/page/{n}/wd/{q}/year/{y}/), as listed
+     * on its filter pages; a sub-category is its own slug. 伦理片 is never offered, and its titles are
+     * taken out of the 电影 lists (see [lunliFiltered]).
+     */
+    private val site = CsMacCms.Site(
+        CsMacCms.Path("/video/", suffix = "/"),
+        types = listOf(
+            CsMacCms.Type(
+                "dianying", "电影",
+                subtypes = listOf(
+                    "dongzuopian" to "动作片", "xijupian" to "喜剧片", "aiqingpian" to "爱情片", "kehuanpian" to "科幻片",
+                    "kongbupian" to "恐怖片", "juqingpian" to "剧情片", "zhanzhengpian" to "战争片", "yingshijieshuo" to "影视解说",
+                    "xuanyipian" to "悬疑片", "fanzuipian" to "犯罪片", "wangluodianying" to "网络电影", "guzhuangpian" to "古装片",
+                    "jilupian" to "记录片", "lishipian" to "历史片",
+                ),
+            ),
+            CsMacCms.Type(
+                "lianxuju", "连续剧",
+                subtypes = listOf("guochanju" to "国产剧", "gangtaiju" to "港台剧", "rihanju" to "日韩剧", "oumeiju" to "欧美剧", "taiguoju" to "泰国剧"),
+                areas = listOf("内地", "韩国", "香港", "台湾", "日本", "美国", "泰国", "英国", "新加坡", "其他"),
+                langs = listOf("国语", "英语", "粤语", "闽南语", "韩语", "日语", "其它"),
+            ),
+            CsMacCms.Type(
+                "zongyi", "综艺",
+                subtypes = listOf("daluzongyi" to "大陆综艺", "rihanzongyi" to "日韩综艺", "gangtaizongyi" to "港台综艺", "oumeizongyi" to "欧美综艺"),
+                areas = listOf("内地", "港台", "日韩", "欧美"),
+                langs = listOf("国语", "英语", "粤语", "闽南语", "韩语", "日语", "其它"),
+            ),
+            CsMacCms.Type(
+                "dongman", "动漫",
+                subtypes = listOf("guochandongman" to "国产动漫", "rihandongman" to "日韩动漫", "oumeidongman" to "欧美动漫"),
+                areas = listOf("国产", "日本", "欧美", "其他"),
+                langs = listOf("国语", "英语", "粤语", "闽南语", "韩语", "日语", "其它"),
+            ),
+            CsMacCms.Type(
+                "shuangwenduanju", "爽文短剧",
+                subtypes = listOf(
+                    "fanzhuannixi" to "反转逆袭", "chuanyuechongsheng" to "穿越重生", "doushiyanqing" to "都市言情",
+                    "nvpinlianai" to "女频恋爱", "guzhuangxianxia" to "古装仙侠",
+                ),
+            ),
+        ),
+        areas = listOf("大陆", "香港", "台湾", "美国", "法国", "英国", "日本", "韩国", "德国", "泰国", "印度", "意大利", "西班牙", "加拿大", "其他"),
+        langs = listOf("国语", "英语", "粤语", "闽南语", "韩语", "日语", "法语", "德语", "其它"),
+        years = CsMacCms.years(17),
+        sorts = listOf("time" to "最新", "hits" to "人气", "score" to "评分"),
+    )
+
+    // Category browsing (shared/CsBrowse.kt): our own category page on CloudStream, the app's own on SkyStream Dev.
+    private val browse = CsBrowse(this, name, site.sections) { id, filters, query, page ->
+        val category = categories.firstOrNull { it.slug == id }
+        val document = getPage(site.url(mainUrl, id, filters, query, page))
+        val cards = document.select(".myui-vodlist__box").mapNotNull { it.toCard(category?.type) }
+        val blocked = if (id == "dianying" && filters[CsMacCms.TYPE].isNullOrBlank()) lunliFiltered(filters, query, page) else emptySet()
+        val items = cards.filterNot { it.id in blocked || isAdultTitle(it.title) }.distinctBy { it.url }.map { it.response }
+        items to (cards.isNotEmpty() && page < lastPage(document, page))
+    }
+
+    /**
+     * The 伦理片 ids that can be on 电影 page [page] with these filters: the same filters on the 伦理片
+     * list (a subset of 电影, ranked the same way), pages as in [lunliPagesFor].
+     */
+    private suspend fun lunliFiltered(filters: Map<String, String>, query: String, page: Int): Set<String> = coroutineScope {
+        lunliPagesFor(page).map { p ->
+            async {
+                val url = site.url(mainUrl, LUNLI_SLUG, filters, query, p)
+                lunliCache[url]?.takeIf { System.currentTimeMillis() - it.first < LUNLI_TTL }?.second
+                    ?: runCatching {
+                        getPage(url).select(".myui-vodlist__box").mapNotNull { it.toCard(TvType.Movie)?.id }.toSet()
+                    }.getOrNull()?.also { lunliCache[url] = System.currentTimeMillis() to it }
+                    ?: emptySet()
+            }
+        }.awaitAll().flatten().toSet()
+    }
+
+
     // 热门观看 from the home page, then the newest and the most watched of each category.
-    override val mainPage = listOf(MainPageData("热门观看", HOME_ROW)) +
-        categories.map { MainPageData("最新${it.label}", "${it.slug}|time") } +
-        categories.map { MainPageData("${it.label}热播榜", if (it.slug == "dianying") MOVIE_HITS_ROW else "${it.slug}|hits") }
+    // On CloudStream the "分类 Categories" row comes first (shared/CsBrowse.kt).
+    override val mainPage = browse.mainPage(
+        listOf(MainPageData("热门观看", HOME_ROW)) +
+            categories.map { MainPageData("最新${it.label}", "${it.slug}|time") } +
+            categories.map { MainPageData("${it.label}热播榜", if (it.slug == "dianying") MOVIE_HITS_ROW else "${it.slug}|hits") },
+    )
 
     /**
      * The site's own 电影 hit list is mostly 伦理片 and other adult titles, so 电影热播榜 merges the hit
@@ -90,7 +173,13 @@ class DarkvodProvider : MainAPI() {
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         if (request.data == HOME_ROW) {
@@ -147,7 +236,11 @@ class DarkvodProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val keyword = URLEncoder.encode(query.trim(), "UTF-8").replace("+", "%20")
         val url = if (page <= 1) "$mainUrl/tag/wd/$keyword/" else "$mainUrl/tag/page/$page/wd/$keyword/"
@@ -166,16 +259,20 @@ class DarkvodProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     /** Only the ad-spliced networks go through the ad stripper; 红牛 and 无尽 play untouched. */

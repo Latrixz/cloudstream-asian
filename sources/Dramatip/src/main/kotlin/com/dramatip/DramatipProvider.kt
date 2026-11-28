@@ -2,6 +2,9 @@ package com.dramatip
 
 import android.util.Log
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsCategories
+import com.csasian.shared.CsSearch
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
@@ -48,11 +51,45 @@ class DramatipProvider : MainAPI() {
     private val mapper = ObjectMapper()
     private val streamKey by lazy { base64(STREAM_KEY_B64) }
 
+    /**
+     * Category browsing (shared/CsBrowse.kt): two sections, "Genres" (the site's genres, /category/<slug>)
+     * and "Apps" (/source/<app>); with none chosen, both list every title (/series). The site has no sorts,
+     * and its New Releases is all Vigloo at the moment (hidden: it doesn't play here), so it isn't the default. Apps whose titles we can't play are left out. A search in a
+     * section is the site's search (it can't be narrowed to a genre or app).
+     */
+    private val browse = CsBrowse(
+        this, name,
+        listOf(
+            CsBrowse.Section(
+                GENRES_SECTION, "Genres", english = "By genre", glyph = "🎭",
+                filters = listOf(CsCategories.Filter(GENRE, "Genre", GENRES.map { (slug, label) -> CsCategories.Option(slug, label) })),
+            ),
+            CsBrowse.Section(
+                APPS_SECTION, "Apps", english = "By app", glyph = "📱",
+                filters = listOf(CsCategories.Filter(APP, "App", APPS.map { (slug, label) -> CsCategories.Option(slug, label) })),
+            ),
+        ),
+    ) { id, filters, query, page ->
+        if (query.isNotBlank()) return@CsBrowse (if (page == 1) searchOwn(query) else emptyList()) to false
+        val path = (if (id == GENRES_SECTION) filters[GENRE]?.let { "/category/$it" } else filters[APP]?.let { "/source/$it" })
+            ?: "/series"
+        listing(path, page).let { (cards, hasNext) -> cards.map { it.toSearchResult() } to hasNext }
+    }
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
+
     // A few rows only: every row is one page load, and Home got slow with many.
     // Every other app stays searchable.
-    override val mainPage = mainPageOf(
+    // On CloudStream the "分类 Categories" row comes first.
+    override val mainPage = browse.mainPage(mainPageOf(
         "/category/trending" to "Trending Now",
-        "/category/new-releases" to "New Releases",
+        // The site's own New Releases is all Vigloo at the moment (hidden: it doesn't play here),
+        // so this row is its /series list, newest first, which has playable titles.
+        "/series" to "New Releases",
         "/category/revenge" to "Revenge",
         "/category/romance" to "Romance",
         "/category/mafia" to "Mafia",
@@ -63,7 +100,7 @@ class DramatipProvider : MainAPI() {
         "/source/rivoshort" to "RivoShort",
         "/source/cinerrashort" to "CinerraShort",
         "/source/loopshort" to "LoopShort",
-    )
+    ))
 
     private data class Card(val slug: String, val title: String, val cover: String?)
 
@@ -71,22 +108,29 @@ class DramatipProvider : MainAPI() {
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
-        val path = if (page > 1) "${request.data}/page/$page" else request.data
-        val html = page(mainUrl + path)
-        val cards = cards(html)
-        val hasNext = html.contains("${request.data}/page/${page + 1}\"")
+        val (cards, hasNext) = listing(request.data, page)
         Log.i(TAG, "row '${request.name}' page $page: ${cards.size} cards, next=$hasNext")
         return newHomePageResponse(request.name, cards.map { it.toSearchResult() }, hasNext)
+    }
+
+    /** Page [page] of a listing ("/category/<genre>", "/source/<app>", "/series") and whether another follows. */
+    private suspend fun listing(path: String, page: Int): Pair<List<Card>, Boolean> {
+        val html = page(mainUrl + if (page > 1) "$path/page/$page" else path)
+        return cards(html) to html.contains("$path/page/${page + 1}\"")
     }
 
     /**
      * The site's search is loose (any word, even a nonsense query gets suggestions), so this reads
      * the first pages and keeps titles that contain every word of the query.
      */
-    override suspend fun search(query: String): List<SearchResponse> {
+    // Also searches the title in English when it was typed in another language (shared/CsSearch.kt).
+    override suspend fun search(query: String): List<SearchResponse> =
+        CsSearch.withExtra(query, 1, "en") { q, _ -> searchOwn(q) to false }.first
+
+    private suspend fun searchOwn(query: String): List<SearchResponse> {
         val words = normalize(query).split(' ').filter { it.isNotBlank() }
         if (words.isEmpty()) return emptyList()
         val pages = coroutineScope {
@@ -144,16 +188,20 @@ class DramatipProvider : MainAPI() {
     // ---- title page ----
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {
@@ -476,6 +524,60 @@ class DramatipProvider : MainAPI() {
         private const val TAG = "Dramatip"
         private const val FLIGHT = "self.__next_f.push([1,\""
         private const val SEARCH_PAGES = 3
+
+        private const val GENRES_SECTION = "genres"
+        private const val APPS_SECTION = "apps"
+        private const val GENRE = "genre"
+        private const val APP = "app"
+
+        /** The site's genres (/categories), slug to name. */
+        private val GENRES = listOf(
+            "new-releases" to "New Releases",
+            "popular" to "Most Watched", "revenge" to "Revenge & Payback", "rise-comeback" to "Rise & Comeback",
+            "hidden-identity" to "Hidden Identity", "second-chance" to "Second Chance & Rebirth",
+            "romance" to "Romance & Sweet Love", "enemies-to-lovers" to "Enemies to Lovers",
+            "marriage-love" to "Marriage & Love", "ceo-billionaire" to "CEO & Billionaire",
+            "rich-family" to "Rich Family & Elite", "strong-women" to "Strong Women",
+            "family-drama" to "Family Drama", "modern-drama" to "Modern Drama",
+            "historical" to "Historical & Period", "fantasy" to "Fantasy & Supernatural",
+            "powerful-hero" to "Powerful Hero", "adored" to "Adored & Pampered", "anime" to "Anime",
+            "trending" to "Trending Now", "mafia" to "Mafia", "regret" to "Regret & Too Late",
+            "mystery-suspense" to "Mystery & Suspense", "dark-romance" to "Dark Romance",
+            "divorce-remarriage" to "Divorce & Remarriage", "reunion" to "Reunion",
+            "youth-campus" to "Youth & Campus", "pregnancy-babies" to "Pregnancy & Babies",
+            "harem-polyamory" to "Harem & Polyamory", "system" to "System", "bl-lgbtq" to "BL & LGBTQ+",
+        )
+
+        /**
+         * The site's apps (/source/<slug>), slug to name, checked 2026-11-27. Left out: ShortPeak and QLAX,
+         * the apps that encrypt their streams (IDrama, DramaBox, ShortTV, JoyReels, StoReel), and those whose
+         * titles we hide because nothing of theirs plays here (Vigloo, PetaDrama, StoryReel, Toonory,
+         * ReelNova, ReelSolis, Flareshort, HiviDrama).
+         */
+        private val APPS = listOf(
+            "anyreel" to "AnyReel", "aura" to "AuraReel", "bibishort" to "BibiShort", "bilitv" to "BiliTV",
+            "blazeflick" to "BlazeFlick", "blinkdrama" to "BlinkDrama", "cinerrashort" to "CinerraShort",
+            "cinerratv" to "CinerraTV", "byte" to "CrispClip", "dotdrama" to "DotDrama", "dramabite" to "DramaBite",
+            "dramabluff" to "DramaBluff", "hive" to "DramaHive", "fictifify" to "Fictifify",
+            "flareflow" to "FlareFlow", "flickreels" to "FlickReels", "fliksotv" to "FliksoTV",
+            "freereels" to "FreeReels", "goodshort" to "GoodShort", "hahip" to "HaHip", "happyshort" to "HappyShort",
+            "joyshort" to "JoyShort", "lix" to "Kaelixs", "kalostv" to "KalosTV", "kynesttv" to "KynestTV",
+            "livoshort" to "LivoShort", "loopshort" to "LoopShort", "lumiloreqj" to "LumiLoreQj",
+            "lunoryqj" to "Lunoryqj", "miraluneqj" to "MiraLuneQj", "miraluneshort" to "MiraLuneShort",
+            "moboreels" to "MoboReels", "moreshort" to "MoreShort", "mydrama" to "MyDrama",
+            "mydramawave" to "MyDramaWave", "myla" to "MylaTV", "mymuse" to "MyMuse", "netshort" to "NetShort",
+            "tread" to "NovaFlick", "novalyratv" to "NovalyraTV", "noviboo" to "Noviboo", "noxtaleda" to "Noxtaleda",
+            "pagejoytv" to "PageJoyTV", "pinedrama" to "PineDrama", "playlet" to "Playlet", "ploryxtv" to "PloRyxTV",
+            "plotify" to "PlotifyTV", "plotsnax" to "PlotSnax", "plotzaqj" to "PlotZaQj", "popiboo" to "PopiBoo",
+            "popmeloqj" to "PopMeloQj", "popnovava" to "PopNovava", "quickeltv" to "QuickelTV", "reelai" to "ReelAI",
+            "reelshort" to "ReelShort", "rivoshort" to "RivoShort", "rovashort" to "RovaShort", "play" to "SanpPlay",
+            "shortical" to "Shortical", "shortwave" to "ShortWave", "sixthshort" to "SixthShort",
+            "sodatv" to "SodaTV", "stardust" to "Stardust", "drame" to "StarReel", "swoopreels" to "SwoopReels",
+            "toonscroll" to "ToonScroll", "toonshort" to "ToonShort", "toptaletv" to "ToptaleTV",
+            "versevoyagetv" to "VersevoyageTV", "bf86d973" to "VibeOFlix", "virexotv" to "VirexoTV",
+            "viscame" to "VisCame", "vivi" to "Vividra", "vyntagetv" to "VyntageTV", "winknoveltv" to "WinkNovelTV",
+            "yourchannel" to "YourChannel", "va" to "Zenva", "ziptaletv" to "ZiptaleTV",
+        )
         private const val CHECK_TIMEOUT_MS = 10_000L
         private const val PAGE_UA = "okhttp/4.12.0"
         private const val BROWSER_UA =

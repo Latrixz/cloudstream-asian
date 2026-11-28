@@ -1,5 +1,7 @@
 package com.cinejoy
 
+import com.csasian.shared.CsTmdbBrowse
+import com.csasian.shared.CsSearch
 import android.util.Log
 import com.csasian.shared.CsBackup
 
@@ -48,7 +50,11 @@ class CinejoyProvider : MainAPI() {
     private val siteHeaders
         get() = mapOf("User-Agent" to USER_AGENT, "Referer" to "$mainUrl/", "Origin" to mainUrl)
 
-    override val mainPage = mainPageOf(
+    // Category browsing (shared/CsTmdbBrowse.kt): TMDB discover through the same TMDB route as the rows,
+    // shown as our own cards (so details and links still go through this source).
+    private val browse = CsTmdbBrowse.create(this, name, get = { tmdb(it) }) { results, kind -> toResults(results, kind) }
+
+    override val mainPage = browse.mainPage(mainPageOf(
         "trending/movie/week" to "Trending Movies",
         "trending/tv/week" to "Trending TV Shows",
         "movie/popular" to "Popular Movies",
@@ -58,11 +64,17 @@ class CinejoyProvider : MainAPI() {
         "${LIST_PREFIX}mindfuck-movies" to "Mindfuck Movies",
         "${LIST_PREFIX}oscar-nominees-best-picture" to "Oscar Nominees for Best Picture",
         "${LIST_PREFIX}based-on-a-true-story" to "Based on a True Story",
-    )
+    ))
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val path = request.data
@@ -110,23 +122,31 @@ class CinejoyProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the English title when the query is in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val json = tmdb("search/multi?query=${enc(query.trim())}&page=$page&include_adult=false")
         return toResults(json["results"], null) to hasNextPage(json, page)
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {

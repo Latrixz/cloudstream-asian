@@ -1,6 +1,8 @@
 package com.kubb
 
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsSearch
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
@@ -8,6 +10,8 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import java.net.URLEncoder
 import java.security.MessageDigest
 
@@ -36,27 +40,56 @@ class KubbProvider : MainAPI() {
             "Referer" to "$mainUrl/",
         )
 
-    // Mirrors the website's category pages: 热播 (orderby=2), 最新添加 (0), 最近更新 (1).
-    override val mainPage = listOf(
-        "3" to "电影",
-        "4" to "电视剧",
-        "5" to "综艺",
-        "6" to "动漫",
-        "7" to "纪录片",
-        "8" to "短剧",
-    ).flatMap { (category, label) ->
-        listOf(
-            "2" to "热播",
-            "0" to "最新添加",
-            "1" to "最近更新",
-        ).map { (order, orderLabel) ->
-            MainPageData("$label · $orderLabel", "$category:$order")
-        }
+    /**
+     * Category browsing (shared/CsBrowse.kt): our own category page on CloudStream, the app's own
+     * category chips on SkyStream Dev. One page goes through the signed list/Search: genre as the
+     * cid's last part, region, year, orderby, and the query as tags.
+     */
+    private val browse = CsBrowse.detailed(
+        this,
+        "酷播 Kubb",
+        KubbCategories.sections,
+        popularSort = KubbCategories.POPULAR_ORDER,
+        hostedTiles = KubbCategories.HOSTED_TILES,
+    ) { q ->
+        val cid = "0,1,${q.section.id}" + (q.filters["genre"]?.let { ",$it" } ?: "")
+        val result = listSearch(
+            tags = q.query,
+            cid = cid,
+            order = q.sort ?: KubbCategories.DEFAULT_ORDER,
+            page = q.page,
+            region = q.filters["region"].orEmpty(),
+            year = q.filters["year"].orEmpty(),
+        )
+        val items = result.result.filter { it.key.isNotBlank() && it.title.isNotBlank() }.distinctBy { it.key }
+            .map { CsBrowse.Title(it.toSearchResponse(), subtitleOf(it)) }
+        CsBrowse.Page(items, items.isNotEmpty() && q.page * PAGE_SIZE < result.recordcount, result.recordcount)
     }
+
+    // The first row, "分类 Categories" (CloudStream only, see CsBrowse), has one card per section. After it,
+    // the website's category pages: 热播 (orderby=2), 最新添加 (0), 最近更新 (1).
+    override val mainPage = browse.mainPage(
+        listOf(
+            "3" to "电影",
+            "4" to "电视剧",
+            "5" to "综艺",
+            "6" to "动漫",
+            "7" to "纪录片",
+            "8" to "短剧",
+        ).flatMap { (category, label) ->
+            listOf(
+                "2" to "热播",
+                "0" to "最新添加",
+                "1" to "最近更新",
+            ).map { (order, orderLabel) ->
+                MainPageData("$label · $orderLabel", "$category:$order")
+            }
+        },
+    )
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val category = request.data.substringBefore(':')
@@ -69,6 +102,18 @@ class KubbProvider : MainAPI() {
         )
     }
 
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
+
+    private fun subtitleOf(item: ListItem): String = listOfNotNull(
+        item.year.takeIf { it > 0 }?.toString(),
+        item.lastName.trim().takeIf { it.isNotBlank() && !it.all(Char::isDigit) },
+        item.score.toDoubleOrNull()?.takeIf { it > 0 }?.let { "★ $it" },
+    ).joinToString(" · ")
+
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
     override suspend fun search(query: String): List<SearchResponse> = searchPage(query, 1).first
@@ -78,14 +123,29 @@ class KubbProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
-        if (query.isBlank()) return emptyList<SearchResponse>() to false
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> = coroutineScope {
+        if (query.isBlank()) return@coroutineScope emptyList<SearchResponse>() to false
+        // Page 1 also searches the title in Chinese when it was typed in another language
+        // ("The Untamed" → 陈情令; see shared/CsSearch.kt), in parallel; our own results come first.
+        val translated = if (page == 1) async { CsSearch.extra(query, lang) { searchOwn(it, 1).first } } else null
+        val (own, hasNext) = searchOwn(query, page)
+        (own + translated?.await().orEmpty()).distinctBy { it.url } to hasNext
+    }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         val result = listSearch(tags = query.trim(), cid = "", order = "0", page = page)
         val items = result.result.distinctBy { it.key }.map { it.toSearchResponse() }
         return items to (page * PAGE_SIZE < result.recordcount && result.result.isNotEmpty())
     }
 
-    private suspend fun listSearch(tags: String, cid: String, order: String, page: Int): SearchResult {
+    private suspend fun listSearch(
+        tags: String,
+        cid: String,
+        order: String,
+        page: Int,
+        region: String = "",
+        year: String = "",
+    ): SearchResult {
         val response = app.get(
             signed(
                 "$listApi/list/Search",
@@ -97,6 +157,8 @@ class KubbProvider : MainAPI() {
                     "orderby" to order,
                     "desc" to "1",
                     "cid" to cid,
+                    "region" to region,
+                    "year" to year,
                     "isserial" to "-1",
                     "isIndex" to "-1",
                     "isfree" to "-1",
@@ -109,16 +171,21 @@ class KubbProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A card of the "分类 Categories" row opens the category browser (first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        // ▶ on a category's own page opens the category browser again.
+        browse.reopen(data)
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {
@@ -420,6 +487,8 @@ data class ListItem(
     val videoClassID: String = "",
     val vipResource: String = "",
     val year: Int = 0,
+    val lastName: String = "",
+    val score: String = "",
 )
 
 data class DetailApiResponse(val ret: Int = 0, val data: DetailApiData? = null)

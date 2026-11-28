@@ -1,5 +1,8 @@
 package com.donghuastream
 
+import com.csasian.shared.CsSearch
+import com.csasian.shared.CsCategories
+import com.csasian.shared.CsBrowse
 import com.csasian.shared.CsBackup
 
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -38,23 +41,81 @@ class DonghuastreamProvider : MainAPI() {
     private val pageHeaders get() = mapOf("User-Agent" to userAgent, "Referer" to "$mainUrl/")
     private val jsonMapper = ObjectMapper()
 
-    override val mainPage = mainPageOf(
+    /**
+     * Category browsing (shared/CsBrowse.kt) with the site's own /anime/ filters: genre, status and year
+     * (its "season"), latest added first, then last updated and popular. One section: the site is all
+     * donghua, and its type and sub/dub filters are near-empty (almost everything is ONA, sub). A search
+     * inside it is the site's search (it has no filters).
+     */
+    private val browse = CsBrowse(
+        this, name,
+        listOf(
+            CsBrowse.Section(
+                "donghua", "国漫",
+                listOf(
+                    CsCategories.Filter(
+                        "genre", "类型 Genre",
+                        listOf(
+                            "action" to "Action", "adventure" to "Adventure", "another-world" to "Another World",
+                            "assassin" to "Assassin", "beast" to "Beast", "drama" to "Drama", "fantasy" to "Fantasy",
+                            "funny" to "Funny", "game" to "Game", "martial-arts" to "Martial Arts", "monsters" to "Monsters",
+                            "mystery" to "Mystery", "reincarnated" to "Reincarnated", "romance" to "Romance", "sci-fi" to "Sci-Fi",
+                            "slice-of-life" to "Slice of Life", "supernatural" to "Supernatural", "swords-fight" to "Swords Fight",
+                            "thriller" to "Thriller", "vengeance" to "Vengeance",
+                        ).map { (value, label) -> CsCategories.Option(value, label) },
+                    ),
+                    CsCategories.Filter(
+                        "status", "状态 Status",
+                        listOf("ongoing" to "Ongoing", "completed" to "Completed", "upcoming" to "Upcoming", "hiatus" to "Hiatus")
+                            .map { (value, label) -> CsCategories.Option(value, label) },
+                    ),
+                    CsCategories.Filter("year", "年份 Year", CsBrowse.years(10)),
+                ),
+                listOf(
+                    CsCategories.Option("latest", "最新 Newest"),
+                    CsCategories.Option("update", "最近更新 Last updated"),
+                    CsCategories.Option("popular", "热门 Popular"),
+                ),
+                english = "Donghua", glyph = "🐉",
+            ),
+        ),
+        popularSort = "popular",
+    ) { _, filters, query, page ->
+        if (query.isNotBlank()) return@CsBrowse searchOwn(query, page)
+        val params = buildString {
+            filters["genre"]?.let { append("genre%5B%5D=").append(it).append('&') }
+            filters["status"]?.let { append("status=").append(it).append('&') }
+            filters["year"]?.let { append("season%5B%5D=").append(it).append('&') }
+            append("order=").append(filters[CsCategories.SORT] ?: "latest")
+        }
+        val document = getPage("$mainUrl/anime/?$params&page=$page")
+        val items = cards(document.selectFirst(".listupd"))
+        items to (items.isNotEmpty() && document.selectFirst(".hpage a.r, .pagination a.next, a.r[href*=page=]") != null)
+    }
+
+    override val mainPage = browse.mainPage(mainPageOf(
         "order=update" to "Latest Update",
         "order=popular" to "Popular",
         "order=latest" to "New Series",
         "status=ongoing&order=popular" to "Ongoing",
         "status=completed&order=popular" to "Completed",
         "type=movie&order=update" to "Movies",
-    )
+    ))
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val document = getPage("$mainUrl/anime/?${request.data}&page=$page")
         val items = cards(document.selectFirst(".listupd"))
-        val hasNext = document.selectFirst(".hpage a.r, .pagination a.next") != null
+        val hasNext = document.selectFirst(".hpage a.r, .pagination a.next, a.r[href*=page=]") != null
         return newHomePageResponse(request.name, items, items.isNotEmpty() && hasNext)
     }
 
@@ -67,7 +128,11 @@ class DonghuastreamProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the English title when the query is in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val encoded = URLEncoder.encode(query.trim(), "UTF-8")
         val document = getPage("$mainUrl/?s=$encoded&paged=$page")
@@ -77,16 +142,20 @@ class DonghuastreamProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {

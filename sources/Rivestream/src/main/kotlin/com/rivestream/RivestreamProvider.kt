@@ -1,7 +1,10 @@
 package com.rivestream
 
+import com.csasian.shared.CsTmdbBrowse
+import com.csasian.shared.CsSearch
 import com.csasian.shared.CsBackup
 
+import android.util.Log
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lagradost.cloudstream3.*
@@ -26,7 +29,7 @@ import java.util.Locale
  * rivestream.app is a Next.js front end over one JSON endpoint, `/api/backendfetch`, which proxies
  * TMDB for the catalogue and resolves streams per "service" (astron, rift, lumen, pulse, ...).
  * Every request carries a `secretKey` that the page computes from the request's id or search
- * query (see [RiveKey]). Most services answer with HLS URLs wrapped in the cors.corsflix.net
+ * query and the UTC day (see [RiveKey]). Most services answer with HLS URLs wrapped in the cors.corsflix.net
  * proxy; the real playlist URL and the headers it needs are encoded in that wrapper.
  */
 class RivestreamProvider : MainAPI() {
@@ -43,8 +46,13 @@ class RivestreamProvider : MainAPI() {
     private val siteHeaders
         get() = mapOf("User-Agent" to userAgent, "Referer" to "$mainUrl/", "Accept" to "application/json")
 
+    // Category browsing (shared/CsTmdbBrowse.kt): TMDB discover through the keyless TMDB proxy (the site's
+    // backendfetch only offers fixed lists), shown as our own cards, so details and links still go through
+    // the site's backend.
+    private val browse = CsTmdbBrowse.create(this, name) { results, kind -> toResults(results, kind, null) }
+
     // "requestID|type|extra query": the rows of the site's home, Movies, TV, K-Drama and Anime pages.
-    override val mainPage = mainPageOf(
+    override val mainPage = browse.mainPage(mainPageOf(
         "trendingMovie|movie|" to "Trending Movies",
         "trendingTv|tv|" to "Trending TV",
         "latestMovie|movie|" to "Latest Movies",
@@ -56,11 +64,17 @@ class RivestreamProvider : MainAPI() {
         "withKeywordsTv|tv|genreKeywords=,&sortBy=popularity.desc&country=KR" to "K-Drama",
         "withKeywordsTv|anime|genreKeywords=210024,&sortBy=popularity.desc" to "Anime",
         "withKeywordsMovie|animemovie|genreKeywords=210024,&sortBy=popularity.desc" to "Anime Movies",
-    )
+    ))
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val (requestId, type, extra) = request.data.split("|", limit = 3)
@@ -89,7 +103,11 @@ class RivestreamProvider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the English title when the query is in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         val q = query.trim()
         if (q.isEmpty()) return emptyList<SearchResponse>() to false
         val json = api(
@@ -100,16 +118,20 @@ class RivestreamProvider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     private suspend fun loadPage(url: String): LoadResponse {
@@ -331,8 +353,19 @@ class RivestreamProvider : MainAPI() {
     /** [keySource] is what the site derives the secretKey from: the id, the search query, or nothing. */
     private suspend fun api(params: Map<String, String>, keySource: String?, timeout: Long = 20L): JsonNode {
         val query = params.entries.joinToString("&") { "${it.key}=${URLEncoder.encode(it.value, "UTF-8")}" }
-        val url = "$mainUrl/api/backendfetch?$query&secretKey=${URLEncoder.encode(RiveKey.of(keySource), "UTF-8")}&proxyMode=noProxy"
-        val response = app.get(url, headers = siteHeaders, timeout = timeout)
+        suspend fun fetch(key: String) = app.get(
+            "$mainUrl/api/backendfetch?$query&secretKey=${URLEncoder.encode(key, "UTF-8")}&proxyMode=noProxy",
+            headers = siteHeaders,
+            timeout = timeout,
+        )
+        var response = fetch(RiveKey.of(keySource, userAgent))
+        if (response.code == 403 && response.text.contains("secret key", ignoreCase = true)) {
+            // The key material changed under us: re-read the site bundle (or fall back) and retry once.
+            Log.w(name, "backendfetch ${params["requestID"]}: secretKey rejected, refreshing key material")
+            val retry = RiveKey.refreshAfterReject(userAgent)
+            if (retry != null) response = fetch(RiveKey.derive(keySource, retry))
+            if (response.code == 403) Log.e(name, "backendfetch ${params["requestID"]}: secretKey still rejected; the site's key algorithm has likely changed")
+        }
         if (!response.isSuccessful) throw ErrorLoadingException("Rivestream API error ${response.code}")
         return mapper.readTree(response.text)
     }

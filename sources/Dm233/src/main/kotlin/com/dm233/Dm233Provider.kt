@@ -3,6 +3,9 @@ package com.dm233
 import android.util.Log
 import com.csasian.shared.CsAdStrip
 import com.csasian.shared.CsBackup
+import com.csasian.shared.CsBrowse
+import com.csasian.shared.CsMacCms
+import com.csasian.shared.CsSearch
 import com.csasian.shared.CsQuality
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -75,15 +78,89 @@ class Dm233Provider : MainAPI() {
     )
     private val hotCategories = listOf(1, 2, MOVIE_TYPE)
 
-    override val mainPage = listOf(
-        MainPageData("最新更新", LATEST_ROW),
-        MainPageData("今日热播", DAYHOT_ROW),
-    ) + categories.map { MainPageData(it.label, "type:${it.id}") } +
-        hotCategories.map { id -> MainPageData("${categories.first { it.id == id }.label}人气榜", "hits:$id") }
+    /**
+     * The site's own filters (/show/{id}--{by}-{class}-----{page}---{year}.html, behind the click-through
+     * gate), as its filter pages list them; the list pages also take a keyword (/wd/{q}). 动画 (type 5,
+     * filler) stays out, as everywhere.
+     */
+    private val site = CsMacCms.Site(
+        CsMacCms.Dash("/show/"),
+        types = listOf(
+            CsMacCms.Type(
+                "1", "日漫",
+                classes = listOf(
+                    "后宫", "校园", "爱情", "恋爱", "热血", "战斗", "竞技", "青春", "百合", "治愈", "喜剧", "动作", "科幻", "奇幻",
+                    "冒险", "搞笑", "悬疑", "推理", "耽美", "美少女", "乙女向", "励志", "武侠", "恐怖", "惊悚", "运动", "萝莉",
+                    "魔法", "神魔", "机战", "社会", "职场", "犯罪", "历史", "战争", "歌舞", "音乐", "西部", "灾难", "短片", "泡面番",
+                ),
+            ),
+            CsMacCms.Type(
+                "2", "国漫",
+                classes = listOf(
+                    "奇幻", "热血", "穿越", "末日", "搞笑", "玄幻", "战斗", "重生", "冒险", "仙侠", "神魔", "修仙", "剧情", "动作",
+                    "喜剧", "励志", "古风", "科幻", "武侠", "都市", "古装", "机战", "校园", "成长", "少儿", "爱情", "悬疑", "推理",
+                    "恐怖", "惊悚", "运动", "犯罪", "历史", "战争", "歌舞", "音乐", "西部", "灾难", "短片",
+                ),
+            ),
+            CsMacCms.Type(
+                MOVIE_TYPE.toString(), "剧场",
+                classes = listOf(
+                    "后宫", "校园", "爱情", "热血", "战斗", "竞技", "青春", "百合", "治愈", "喜剧", "穿越", "动作", "科幻", "奇幻",
+                    "冒险", "末日", "玄幻", "搞笑", "重生", "悬疑", "推理", "耽美", "美少女", "乙女向", "励志", "武侠", "恐怖",
+                    "惊悚", "运动", "萝莉", "魔法", "仙侠", "修仙", "剧情", "神魔", "机战", "社会", "职场", "犯罪", "历史", "战争",
+                    "歌舞", "音乐", "西部", "灾难", "古风", "古装", "都市", "成长", "少儿",
+                ),
+            ),
+            CsMacCms.Type(
+                "3", "美漫",
+                classes = listOf(
+                    "少儿", "恶搞", "烧脑", "喜剧", "动作", "科幻", "奇幻", "爱情", "同性", "耽美", "悬疑", "推理", "武侠", "恐怖",
+                    "惊悚", "运动", "冒险", "犯罪", "历史", "战争", "歌舞", "音乐", "西部", "灾难", "短片",
+                ),
+            ),
+            CsMacCms.Type(
+                "4", "特摄",
+                classes = listOf(
+                    "少儿", "喜剧", "动作", "科幻", "奇幻", "爱情", "悬疑", "推理", "同性", "耽美", "武侠", "恐怖", "惊悚", "运动",
+                    "冒险", "犯罪", "历史", "战争", "歌舞", "音乐", "西部", "灾难", "短片",
+                ),
+            ),
+        ),
+        years = CsMacCms.years(27) + "更早",
+        sorts = listOf("time" to "最新", "hits" to "最热", "score" to "评分"),
+    )
+
+    // Category browsing (shared/CsBrowse.kt): our own category page on CloudStream, the app's own on SkyStream Dev.
+    private val browse = CsBrowse(this, name, site.sections) { id, filters, query, page ->
+        val type = if (id == MOVIE_TYPE.toString()) TvType.AnimeMovie else TvType.Anime
+        val document = getGated(site.url(mainUrl, id, filters, query, page))
+        val items = document.cards { _, _ -> type }.map { it.first }
+        // The page number is the 9th field of /show/{id}-...-{page}---{year}.html.
+        val last = document.select("a[href*=/show/]").mapNotNull { a ->
+            a.attr("href").substringAfter("/show/").substringBefore(".html").substringBefore("/wd/")
+                .split('-').getOrNull(8)?.toIntOrNull()
+        }.maxOrNull() ?: page
+        items to (items.isNotEmpty() && page < last)
+    }
+
+    // On CloudStream the "分类 Categories" row comes first (see CsBrowse).
+    override val mainPage = browse.mainPage(
+        listOf(
+            MainPageData("最新更新", LATEST_ROW),
+            MainPageData("今日热播", DAYHOT_ROW),
+        ) + categories.map { MainPageData(it.label, "type:${it.id}") } +
+            hotCategories.map { id -> MainPageData("${categories.first { it.id == id }.label}人气榜", "hits:$id") },
+    )
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
-        com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+        browse.rowPage(request) ?: com.csasian.shared.CsMore.wrap(this, request, page, mainPageOwn(page, request))
+
+    // Categories SkyStream Dev shows itself (shared/CsCategories.kt); the engine finds these by name.
+    fun csCategories(): String = browse.categoriesJson()
+
+    fun csCategoryPage(categoryId: String, filtersJson: String, query: String, page: Int): SearchResponseList =
+        browse.categoryPage(categoryId, filtersJson, query, page)
 
     private suspend fun mainPageOwn(page: Int, request: MainPageRequest): HomePageResponse {
         val data = request.data
@@ -152,7 +229,11 @@ class Dm233Provider : MainAPI() {
         return newSearchResponseList(results, hasNext)
     }
 
-    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
+    // Page 1 also searches the title in Chinese when it was typed in another language (shared/CsSearch.kt).
+    private suspend fun searchPage(query: String, page: Int): Pair<List<SearchResponse>, Boolean> =
+        CsSearch.withExtra(query, page, lang) { q, p -> searchOwn(q, p) }
+
+    private suspend fun searchOwn(query: String, page: Int): Pair<List<SearchResponse>, Boolean> {
         if (query.isBlank()) return emptyList<SearchResponse>() to false
         val keyword = URLEncoder.encode(query.trim(), "UTF-8").replace("+", "%20")
         val url = if (page == 1) "$mainUrl/search/$keyword-------------.html"
@@ -166,16 +247,20 @@ class Dm233Provider : MainAPI() {
     }
 
     // Remembers episodes and adds backup links from our other sources (see shared/CsBackup.kt).
+    // A "分类 Categories" card opens the category page (browse.load first: it checks who is asking).
     override suspend fun load(url: String): LoadResponse =
-        com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
+        browse.load(url) ?: com.csasian.shared.CsMore.load(this, url) ?: loadPage(url).also { CsBackup.remember(this, it) }
 
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
-        loadOwnLinks(data, isCasting, subtitleCallback, callback)
+    ): Boolean {
+        browse.reopen(data) // ▶ on a category's own page opens the category page again.
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+            loadOwnLinks(data, isCasting, subtitleCallback, callback)
+        }
     }
 
     /** Strips the ad clips the supply networks splice into their playlists (暴风 /adjump/ etc.). */
