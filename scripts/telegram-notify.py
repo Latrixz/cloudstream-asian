@@ -5,7 +5,8 @@ Usage: telegram-notify.py <old plugins.json> <new plugins.json>
 Env: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT (e.g. @csasian), COMMIT_MESSAGE (optional, for notes),
      TELEGRAM_NOTICE_CHAT (optional, e.g. the old @csasian_news channel): gets a short
      "there's an update, we've moved" notice linking to the full post in TELEGRAM_CHAT.
-Posts nothing when no source changed (README or CI-only commits stay quiet).
+Posts nothing when no source changed (README or CI-only commits stay quiet),
+or when the commit message contains "[no post]".
 """
 import json
 import os
@@ -45,6 +46,10 @@ def load(path):
 
 old, new = load(sys.argv[1]), load(sys.argv[2])
 if not new:
+    sys.exit(0)
+# A follow-up fix can stay quiet and be added to the last post instead (telegram-edit.yml).
+if "[no post]" in os.environ.get("COMMIT_MESSAGE", ""):
+    print("[no post] in the commit message; nothing announced.")
     sys.exit(0)
 
 added = [p for k, p in new.items() if k not in old]

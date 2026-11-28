@@ -1,0 +1,27 @@
+name: Edit a Telegram post
+# Change the text of an earlier post on @csasian through the bot: Actions → "Edit a Telegram post" → Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      message_id:
+        description: "The post's number (the last part of its link, e.g. 54 for t.me/csasian/54)"
+        required: true
+      text:
+        description: "The post's new text"
+        required: true
+permissions: {}
+jobs:
+  edit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Edit the post
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          MESSAGE_ID: ${{ github.event.inputs.message_id }}
+          TEXT: ${{ github.event.inputs.text }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${TOKEN}/editMessageText" \
+            --data-urlencode "chat_id=@csasian" \
+            --data-urlencode "message_id=${MESSAGE_ID}" \
+            --data-urlencode "text=${TEXT}" \
+            --data-urlencode "disable_web_page_preview=true" | python3 -c "import json,sys;d=json.load(sys.stdin);print('ok:',d.get('ok'),d.get('description',''));sys.exit(0 if d.get('ok') else 1)"

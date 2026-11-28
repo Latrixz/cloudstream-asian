@@ -192,10 +192,11 @@ class UvodProvider : MainAPI() {
         }
         val allFragments = info.fragments.orEmpty()
         // Policy (see class comment): only fragments that offer the guest tier.
-        val freeFragments = allFragments.filter { GUEST_QUALITY in it.qualities }
-        if (freeFragments.isEmpty()) {
-            throw ErrorLoadingException("《${video.title}》只提供超清/蓝光画质，需要 VIP 才能观看；本插件只播放免费的标清版本")
-        }
+        // A title with no free tier still opens: its episodes find no link here (only the guest
+        // tier is ever requested) and play from our other sources instead (shared/CsBackup.kt).
+        val vipOnly = allFragments.none { GUEST_QUALITY in it.qualities }
+        val freeFragments = if (vipOnly) allFragments else allFragments.filter { GUEST_QUALITY in it.qualities }
+        if (freeFragments.isEmpty()) throw ErrorLoadingException("《${video.title}》暂无可播放的集数")
 
         val detailUrl = playUrl(video.id)
         val type = typeOf(video.parentCategoryId, video.categoryId, video.multipleFragment)
@@ -207,7 +208,9 @@ class UvodProvider : MainAPI() {
             names(video.director.orEmpty(), 3).map { ActorData(Actor(it), roleString = "导演") }).ifEmpty { null }
         val notes = listOfNotNull(
             video.state.orEmpty().trim().takeIf { it.isNotBlank() },
-            if (!isMovie && freeFragments.size < allFragments.size) {
+            if (vipOnly) {
+                "UVOD 只有 VIP 画质，将从我们的其他来源播放 · VIP-only on UVOD, plays from our other sources"
+            } else if (!isMovie && freeFragments.size < allFragments.size) {
                 "免费标清集数：${freeFragments.size}/${allFragments.size}，其余需 VIP"
             } else {
                 null
@@ -276,7 +279,7 @@ class UvodProvider : MainAPI() {
         // Policy: the server answers with its best tier when tier 1 doesn't exist; never play that.
         if (source.quality != GUEST_QUALITY || !source.url.startsWith("http")) return false
         callback(
-            newExtractorLink(name, "$name 标清", source.url, ExtractorLinkType.M3U8) {
+            newExtractorLink(name, "$name 标清", playable(source.url), ExtractorLinkType.M3U8) {
                 // The free tier's actual resolution varies per title (448p-720p seen), so no fixed label.
                 quality = Qualities.Unknown.value
                 headers = mapOf("User-Agent" to userAgent)
@@ -284,6 +287,14 @@ class UvodProvider : MainAPI() {
         )
         return true
     }
+
+    /**
+     * The *.oledsa.com video hosts use an SSL.com certificate that older Android (e.g. Android TV 9-11)
+     * doesn't trust, so playback failed with ERR_CERT_AUTHORITY_INVALID. The same hosts serve the
+     * same playlist and segments over plain http, which needs no certificate.
+     */
+    private fun playable(url: String): String =
+        if (Regex("^https://[^/]*\\.oledsa\\.com/").containsMatchIn(url)) "http://" + url.removePrefix("https://") else url
 
     /** POSTs an encrypted, signed request and decrypts the answer. */
     private suspend inline fun <reified T> api(path: String, params: Map<String, Any?>): T {
