@@ -28,7 +28,8 @@ import javax.crypto.spec.SecretKeySpec
  * Every response body is AES-256-CBC encrypted base64 text with '+' written as '@' and '/' as '-_.'.
  * The HLS segments are named .png but are plain MPEG-TS, so the playlist plays as-is.
  *
- * Our URLs mirror the site's routes: /detail/{id} for titles and /detail/{id}/{playId} for episodes.
+ * Our URLs mirror the site's routes: /detail/{id} for titles and /detail/{identifier}/{playId} for
+ * episodes (the episode's identifier, see episodeData).
  */
 class OneTouchTVProvider : MainAPI() {
     override var mainUrl = "https://onetouchtv.xyz"
@@ -45,13 +46,20 @@ class OneTouchTVProvider : MainAPI() {
         get() = mapOf("User-Agent" to userAgent, "Referer" to "$mainUrl/", "Origin" to mainUrl)
     private val mapper = ObjectMapper()
 
+    /**
+     * The API's own country list (vod/filters), most-watched first: the value it filters on and a label.
+     * Its "usa" finds nothing, and "american" holds mostly Asian titles, so it is left out.
+     */
     private val countries = listOf(
         "korean" to "Korean",
         "chinese" to "Chinese",
-        "thai" to "Thai",
         "japanese" to "Japanese",
+        "thai" to "Thai",
         "taiwanese" to "Taiwanese",
+        "hong kong" to "Hong Kong",
+        "singapore" to "Singapore",
         "filipino" to "Filipino",
+        "asia" to "More Asia",
     )
 
     /**
@@ -87,10 +95,7 @@ class OneTouchTVProvider : MainAPI() {
     private fun ottFilters() = listOf(
         CsCategories.Filter(
             "country", "地区 Country",
-            listOf(
-                "korean" to "Korea", "chinese" to "China", "japanese" to "Japan", "thai" to "Thailand",
-                "taiwanese" to "Taiwan", "hong kong" to "Hong Kong", "filipino" to "Philippines",
-            ).map { (value, label) -> CsCategories.Option(value, label) },
+            countries.map { (value, label) -> CsCategories.Option(value, label) },
         ),
         CsCategories.Filter(
             "genre", "类型 Genre",
@@ -112,7 +117,12 @@ class OneTouchTVProvider : MainAPI() {
         "vod/movie?" to "Newest Movies",
         "top|day" to "Top Today",
         "top|week" to "Top This Week",
-    ) + countries.map { (key, label) -> MainPageData("$label Dramas & Movies", "vod/filter?country=$key&") })
+        "vod/filter?type=drama&" to "Dramas",
+        "vod/filter?type=movie&" to "Movies",
+        "vod/filter?type=tv%20show&" to "TV Shows",
+    ) + countries.map { (key, label) ->
+        MainPageData(label, "vod/filter?country=${URLEncoder.encode(key, "UTF-8").replace("+", "%20")}&")
+    })
 
     // SkyStream never asks for page 2; there a row with more pages ends with a "More ›" card.
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse =
@@ -168,7 +178,7 @@ class OneTouchTVProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit,
     ): Boolean {
         browse.reopen(data) // ▶ on a category's own page opens the category page again.
-        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) { callback ->
             loadOwnLinks(data, isCasting, subtitleCallback, callback)
         }
     }
@@ -218,7 +228,7 @@ class OneTouchTVProvider : MainAPI() {
         val recommended = recommendations(id, country, genres.firstOrNull())
 
         return if (isMovie) {
-            newMovieLoadResponse(title, detailUrl, TvType.Movie, "$detailUrl/${episodes[0].first}") {
+            newMovieLoadResponse(title, detailUrl, TvType.Movie, episodeData(detailUrl, episodes[0].first, episodes[0].third)) {
                 posterUrl = poster
                 backgroundPosterUrl = background
                 this.plot = plot
@@ -231,9 +241,10 @@ class OneTouchTVProvider : MainAPI() {
             }
         } else {
             val list = episodes.mapIndexed { index, (playId, number, ep) ->
-                newEpisode("$detailUrl/$playId") {
+                newEpisode(episodeData(detailUrl, playId, ep)) {
                     this.episode = number ?: (index + 1)
-                    this.name = "Episode ${number ?: playId}"
+                    // The app puts the number in front ("1. …"), so an app-only episode's name is just the note.
+                    this.name = if (isAppOnly(ep)) APP_ONLY_LABEL else "Episode ${number ?: playId}"
                     ep.text("released_at")?.let { addDate(it.take(10)) }
                 }
             }
@@ -262,7 +273,9 @@ class OneTouchTVProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
     ): Boolean {
-        // data = https://onetouchtv.xyz/detail/{id}/{playId}
+        // data = https://onetouchtv.xyz/detail/{id}/{playId}, with #app-only for an app-locked episode
+        // (see isAppOnly): the site gives no link for those, so don't ask; our other sources play it.
+        if (data.endsWith(APP_ONLY_MARK)) return false
         val path = data.substringBefore('#').substringBefore('?').removePrefix("$mainUrl/detail/")
         val id = path.substringBefore('/').ifBlank { return false }
         val playId = path.substringAfter('/', "").ifBlank { return false }
@@ -310,6 +323,22 @@ class OneTouchTVProvider : MainAPI() {
                 .filter { idFromUrl(it.url) != id }
                 .take(MAX_RECOMMENDATIONS)
         }.getOrDefault(emptyList())
+    }
+
+    /**
+     * The site locks some episodes to its own app ("Currently, this episode only available on app. It
+     * will be available on website soon."): the episode API answers 404 for them. We use the website
+     * only, so such an episode is labelled and plays from our other sources (shared/CsBackup.kt).
+     */
+    private fun isAppOnly(ep: JsonNode): Boolean = ep.path("lockContentDetails").path("lockContent").asBoolean(false)
+
+    /**
+     * The episode API wants the episode's own `identifier` ("queen-of-tears-2024"), which can differ
+     * from the title's id ("queen-of-tears"): with the title's id it answers 404.
+     */
+    private fun episodeData(detailUrl: String, playId: String, ep: JsonNode): String {
+        val base = ep.text("identifier")?.let { "$mainUrl/detail/$it" } ?: detailUrl
+        return "$base/$playId" + if (isAppOnly(ep)) APP_ONLY_MARK else ""
     }
 
     /** GETs an API path and returns the decrypted JSON. */
@@ -389,6 +418,8 @@ class OneTouchTVProvider : MainAPI() {
         path(field).takeIf { it.isValueNode && !it.isNull }?.asText()?.trim()?.ifBlank { null }
 
     companion object {
+        private const val APP_ONLY_MARK = "#app-only"
+        private const val APP_ONLY_LABEL = "App only · plays from backups"
         private const val AES_KEY = "im72charPasswordofdInitVectorStm"
         private const val PAGE_SIZE = 20
         private const val MAX_ACTORS = 20

@@ -177,7 +177,7 @@ class UvodProvider : MainAPI() {
         // ▶ on a category's own page opens the category browser again.
         browse.reopen(data)
         if (CsMore.isMore(data)) return false
-        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) { callback ->
             loadOwnLinks(data, isCasting, subtitleCallback, callback)
         }
     }

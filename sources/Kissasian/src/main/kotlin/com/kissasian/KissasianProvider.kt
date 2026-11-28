@@ -184,7 +184,7 @@ class KissasianProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit,
     ): Boolean {
         browse.reopen(data) // ▶ on a category's own page opens the category page again.
-        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) { callback ->
             loadOwnLinks(data, isCasting, subtitleCallback, callback)
         }
     }

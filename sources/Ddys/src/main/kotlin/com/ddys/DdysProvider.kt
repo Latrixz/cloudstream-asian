@@ -93,7 +93,7 @@ class DdysProvider : MainAPI() {
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+    ): Boolean = CsBackup.loadLinks(this, data, subtitleCallback, callback) { callback ->
         loadOwnLinks(data, isCasting, subtitleCallback, callback)
     }
 

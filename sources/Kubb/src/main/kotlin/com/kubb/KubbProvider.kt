@@ -183,7 +183,7 @@ class KubbProvider : MainAPI() {
     ): Boolean {
         // ▶ on a category's own page opens the category browser again.
         browse.reopen(data)
-        return CsBackup.loadLinks(this, data, subtitleCallback, callback) {
+        return CsBackup.loadLinks(this, data, subtitleCallback, callback) { callback ->
             loadOwnLinks(data, isCasting, subtitleCallback, callback)
         }
     }

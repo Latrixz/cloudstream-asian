@@ -24,8 +24,8 @@ import com.lagradost.cloudstream3.CommonActivity
 /**
  * "支持 CS Asian · Support" popup, shared by every cloudstream-asian plugin (compiled into each).
  * All copies share one schedule in the app's key store, so a user sees one popup however many
- * of our sources they have: on first use, then at most once a week. There is no "I've supported"
- * switch: the app can't tell who paid, so everyone sees it weekly. It is only checked when the app starts (Plugin.load), so
+ * of our sources they have: on first use, then at most once a day. There is no "I've supported"
+ * switch: the app can't tell who paid, so everyone sees it daily. It is only checked when the app starts (Plugin.load), so
  * switching between sources never brings it up. The QR code (Buy Me a Coffee) is embedded, because
  * most TVs have no browser to open a link.
  */
@@ -35,7 +35,7 @@ object CsSupport {
 
     private const val KEY_NEXT = "csasian_support_next"
     private const val DAY = 24L * 60 * 60 * 1000
-    private const val LATER = 7 * DAY
+    private const val LATER = 1 * DAY
     private const val LINK = "buymeacoffee.com/latrixz"
     /** This month's goal (Cloudflare Worker fed by Buy Me a Coffee webhooks, see support-worker/). */
     private const val STATS_URL = "https://csasian-support.airroom.workers.dev/stats"
@@ -104,7 +104,8 @@ object CsSupport {
             // Test builds: once per app run (the run is marked with the process id).
             val runMark = -android.os.Process.myPid().toLong()
             if (FORCE) { if (shownThisRun || next == runMark) return }
-            else if (shownThisRun || (next != null && next > 0 && now < next)) return
+            // A time further off than LATER is from the old weekly schedule: due now instead.
+            else if (shownThisRun || (next != null && next > 0 && now < next && next - now <= LATER)) return
             // Claim it before showing, so the other plugins' copies stay quiet.
             CloudStreamApp.setKeyClass(KEY_NEXT, if (FORCE) runMark else now + LATER)
             shownThisRun = true

@@ -1,5 +1,5 @@
 // Use an integer for version numbers
-version = 5
+version = 6
 
 // The site logic is shared with the other site on the same backend (sources/_anime-common).
 extensions.getByName<com.android.build.gradle.BaseExtension>("android")

@@ -12,14 +12,21 @@ import com.lagradost.cloudstream3.TvSeriesLoadResponse
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.amap
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Backup links ("备用"), shared by every cloudstream-asian source (compiled into each plugin).
@@ -48,6 +55,13 @@ object CsBackup {
     private const val WAIT_WITH_OWN_MS = 9_000L
     private const val WAIT_WITHOUT_OWN_MS = 25_000L
     private const val PER_SOURCE_MS = 20_000L
+    /** How long the check of the source's own links may take, and how many are checked. */
+    private const val CHECK_MS = 5_000L
+    private const val CHECK_LINKS = 3
+    /** Without a working own link: how long to wait for more backups after the first one. */
+    private const val AFTER_FIRST_MS = 3_000L
+    /** Loading the details page of an episode that wasn't remembered. */
+    private const val RECOVER_MS = 8_000L
 
     private class Ep(val title: String, val year: Int?, val movie: Boolean, val season: Int?, val episode: Int?)
 
@@ -109,30 +123,155 @@ object CsBackup {
         data: String,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-        own: suspend () -> Boolean,
+        /** The source's own lookup; it sends its links to the callback it is given. */
+        own: suspend (callback: (ExtractorLink) -> Unit) -> Boolean,
     ): Boolean {
         val isBackupCall = currentCoroutineContext()[CoroutineName]?.name == MARKER
-        val ep = if (isBackupCall || !enabled()) null else lookup(data)
-        if (ep == null) return own()
+        if (isBackupCall || !enabled()) return own(callback)
+        val known = lookup(data)
 
         return coroutineScope {
-            val started = System.currentTimeMillis()
-            val backup = async { findBackups(api, ep, subtitleCallback, callback) }
+            var started = System.currentTimeMillis()
+            // Set as soon as any backup link is handed over, so a slow source still searching when
+            // time runs out doesn't make the ones already found count as nothing.
+            val gotBackup = AtomicBoolean(false)
+            val firstBackupAt = java.util.concurrent.atomic.AtomicLong(0L)
+            fun startBackups(ep: Ep) = async {
+                findBackups(api, ep, subtitleCallback) { link ->
+                    if (gotBackup.compareAndSet(false, true)) firstBackupAt.set(System.currentTimeMillis())
+                    callback(link)
+                }
+            }
+            // Known episode: search our other sources alongside the source's own lookup.
+            var backup = known?.let { startBackups(it) }
             var ownError: Throwable? = null
+            val ownLinks = ConcurrentLinkedQueue<ExtractorLink>()
             val ownOk = try {
-                own()
+                own { link ->
+                    ownLinks.add(link)
+                    callback(link)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
                 ownError = e
                 false
             }
-            val budget = (if (ownOk) WAIT_WITH_OWN_MS else WAIT_WITHOUT_OWN_MS) - (System.currentTimeMillis() - started)
-            val found = withTimeoutOrNull(budget.coerceAtLeast(1L)) { backup.await() } ?: false
-            backup.cancel()
-            if (!ownOk && !found && ownError != null) throw ownError
+            // A link that doesn't load on this device (a certificate it doesn't trust, a dead
+            // host, a 404) is no link: then the backups get the full time, not the short one.
+            val ownWorks = ownOk && anyLoads(ownLinks.toList())
+            if (backup == null) {
+                // The episode wasn't seen being loaded in this session (an app that reopens a saved
+                // details page, or plays from history). Only when the source has nothing that works,
+                // load its details page now to learn the title, then search the others.
+                if (ownWorks) return@coroutineScope true
+                val ep = withTimeoutOrNull(RECOVER_MS) { recover(api, data) }
+                if (ep == null) {
+                    if (!ownOk && ownError != null) throw ownError!!
+                    return@coroutineScope ownOk
+                }
+                started = System.currentTimeMillis()
+                backup = startBackups(ep)
+            }
+            val search = backup!!
+            val budget = (if (ownWorks) WAIT_WITH_OWN_MS else WAIT_WITHOUT_OWN_MS) - (System.currentTimeMillis() - started)
+            val found = (withTimeoutOrNull(budget.coerceAtLeast(1L)) {
+                if (ownWorks) return@withTimeoutOrNull search.await()
+                // Without a working link of its own, play as soon as backups are here: a few
+                // seconds after the first one, for others to join, not after the slowest source.
+                while (search.isActive && (firstBackupAt.get() == 0L || System.currentTimeMillis() - firstBackupAt.get() < AFTER_FIRST_MS)) {
+                    kotlinx.coroutines.delay(200)
+                }
+                if (search.isActive) true else search.await()
+            } ?: false) || gotBackup.get()
+            search.cancel()
+            if (!ownOk && !found && ownError != null) throw ownError!!
             ownOk || found
         }
+    }
+
+    /**
+     * The episode behind [data] when it wasn't remembered: loads the details page it most likely
+     * belongs to (the data itself, then without its last part: ".../title/1" → ".../title"), which
+     * remembers its episodes, and looks [data] up again.
+     */
+    private suspend fun recover(api: MainAPI, data: String): Ep? {
+        if (!data.startsWith("http")) return null
+        val base = data.substringBefore('#').substringBefore('?').trimEnd('/')
+        val candidates = listOf(base, base.substringBeforeLast('/')).distinct()
+            .filter { it.count { c -> c == '/' } >= 3 }
+        for (url in candidates) {
+            val response = try {
+                api.load(url)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                null
+            } ?: continue
+            remember(api, response)
+            lookup(data)?.let { return it }
+            // A movie page whose play data isn't [data] itself is still the title.
+            if (response is MovieLoadResponse) return Ep(response.name, response.year, true, null, null)
+        }
+        return null
+    }
+
+    /** Whether any of the first few [links] loads on this device (see [loads]); true for none to check. */
+    private suspend fun anyLoads(links: List<ExtractorLink>): Boolean {
+        val checkable = links.filter { it.url.startsWith("http") }.take(CHECK_LINKS)
+        if (checkable.isEmpty()) return links.isNotEmpty()
+        return withTimeoutOrNull(CHECK_MS) {
+            coroutineScope {
+                checkable.map { link -> async(Dispatchers.IO) { loads(link) } }.awaitAll().any { it }
+            }
+        } ?: true // Too slow to tell: don't count a slow host as dead.
+    }
+
+    /**
+     * Opens [link] the way a player would, with the device's own certificate checks (the app's
+     * HTTP client skips them, the player doesn't). Only clear failures count: a certificate,
+     * connection or DNS error, a 4xx or 5xx, or a playlist that isn't one. A 401/403 may just
+     * want headers the player adds, and a 429 is a busy host, so those count as loading.
+     */
+    private fun loads(link: ExtractorLink): Boolean {
+        val conn = try {
+            URL(link.url).openConnection() as HttpURLConnection
+        } catch (_: Throwable) {
+            return true
+        }
+        return try {
+            conn.connectTimeout = 4_000
+            conn.readTimeout = 4_000
+            conn.instanceFollowRedirects = true
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0")
+            if (link.referer.isNotBlank()) conn.setRequestProperty("Referer", link.referer)
+            link.headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
+            val code = conn.responseCode
+            when {
+                code == 401 || code == 403 || code == 429 -> true
+                code !in 200..399 -> false
+                link.type == ExtractorLinkType.M3U8 ->
+                    conn.inputStream.use { String(it.readNBytesCompat(2048)) }.trimStart('\uFEFF', ' ', '\n', '\r').startsWith("#EXTM3U")
+                else -> true
+            }
+        } catch (_: java.net.SocketTimeoutException) {
+            true // Slow is not dead.
+        } catch (_: Throwable) {
+            false // Certificate, connection refused, unknown host...
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun java.io.InputStream.readNBytesCompat(max: Int): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(1024)
+        while (out.size() < max) {
+            val n = read(buf, 0, minOf(buf.size, max - out.size()))
+            if (n < 0) break
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
     }
 
     private suspend fun findBackups(
@@ -169,9 +308,12 @@ object CsBackup {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
     ): Boolean {
-        val want = norm(ep.title)
-        if (want.isEmpty()) return false
-        val hits = search(api, ep.title).filter { norm(it.name) == want }.take(3)
+        val want = titleKey(ep.title)
+        if (want.first.isEmpty()) return false
+        // The title as is, then the show's plain name: sites write a season many ways ("Season 2",
+        // "2", "S2", "第二季"), and a search for one spelling may not find another.
+        val queries = listOf(ep.title, baseTitle(ep.title)).filter { it.isNotBlank() }.distinctBy { norm(it) }
+        val hits = queries.flatMap { search(api, it) }.distinctBy { it.url }.filter { titleKey(it.name) == want }.take(3)
         for (hit in hits) {
             val loaded = api.load(hit.url) ?: continue
             if (!sameYear(ep.year, loaded.year)) continue
@@ -185,8 +327,10 @@ object CsBackup {
                     newExtractorLink(label, "$label · ${l.name.removePrefix(api.name).trim().ifEmpty { l.name }}" + qualityTag(l.quality), l.url, l.type) {
                         referer = l.referer
                         // Backups never outrank the source's own links (CloudStream plays the
-                        // highest quality first); they're for when those fail.
-                        quality = com.lagradost.cloudstream3.utils.Qualities.P144.value
+                        // highest quality first); they're for when those fail. SkyStream shows
+                        // the number ("1080p · 144p"), so there they keep their real quality.
+                        quality = if (CsLogos.onSkyStream) realQuality(l.quality)
+                            else com.lagradost.cloudstream3.utils.Qualities.P144.value
                         headers = l.headers
                         extractorData = l.extractorData
                     }
@@ -199,7 +343,12 @@ object CsBackup {
 
     /** " 1080p" for a known quality (the link itself is ranked last, see linksFrom). */
     private fun qualityTag(q: Int): String =
-        if (q in 144..4320 && q != com.lagradost.cloudstream3.utils.Qualities.Unknown.value) " ${q}p" else ""
+        if (realQuality(q) != com.lagradost.cloudstream3.utils.Qualities.Unknown.value) " ${q}p" else ""
+
+    /** [q], or Unknown for none and for 144, which our sources use to rank a link last, not as a size. */
+    private fun realQuality(q: Int): Int =
+        if (q in 240..4320 && q != com.lagradost.cloudstream3.utils.Qualities.Unknown.value) q
+        else com.lagradost.cloudstream3.utils.Qualities.Unknown.value
 
     private suspend fun search(api: MainAPI, query: String): List<SearchResponse> = try {
         api.search(query).orEmpty()
@@ -233,6 +382,41 @@ object CsBackup {
     }
 
     private fun sameYear(a: Int?, b: Int?) = a == null || b == null || kotlin.math.abs(a - b) <= 1
+
+    private val SEASON_MARKS = listOf(
+        Regex("(?i)\\s*[-:：,，]?\\s*\\bseason\\s*(\\d{1,2})\\b"),
+        Regex("(?i)\\s*[-:：,，]?\\s*\\b(\\d{1,2})(?:st|nd|rd|th)\\s+season\\b"),
+        Regex("(?i)\\s*\\bS(\\d{1,2})\\s*$"),
+        Regex("\\s*第\\s*([0-9一二三四五六七八九十]+)\\s*[季部]"),
+        Regex("\\s+(\\d{1,2})\\s*$"),
+    )
+
+    /** The season a title names ("… Season 2", "… 2", "… S2", "…第二季"), and the title without it. */
+    private fun splitSeason(title: String): Pair<String, Int> {
+        val t = title.replace(Regex("[(（\\[【]\\s*\\d{4}\\s*[)）\\]】]"), "").trim()
+        for (mark in SEASON_MARKS) {
+            val m = mark.find(t) ?: continue
+            val n = seasonNumber(m.groupValues[1]) ?: continue
+            if (n in 1..30) return t.removeRange(m.range).trim() to n
+        }
+        return t to 1
+    }
+
+    private fun seasonNumber(s: String): Int? = s.toIntOrNull() ?: run {
+        val digits = "一二三四五六七八九"
+        when {
+            s == "十" -> 10
+            s.length == 1 -> digits.indexOf(s[0]).takeIf { it >= 0 }?.plus(1)
+            s.startsWith("十") -> digits.indexOf(s[1]).takeIf { it >= 0 }?.plus(11)
+            else -> null
+        }
+    }
+
+    /** What makes two titles the same show and season: "The Glory Fades Season 2" == "The Glory Fades 2". */
+    private fun titleKey(title: String): Pair<String, Int> = splitSeason(title).let { (base, n) -> norm(base) to n }
+
+    /** The title without its season, for searching ("The Glory Fades Season 2" → "The Glory Fades"). */
+    private fun baseTitle(title: String): String = splitSeason(title).first
 
     /** Lowercase, without spaces, punctuation or a trailing year: "The Glory (2022)" -> "theglory". */
     private fun norm(title: String): String =
