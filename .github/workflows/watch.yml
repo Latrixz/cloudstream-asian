@@ -29,6 +29,8 @@ jobs:
           TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT: ${{ vars.TELEGRAM_WATCH_CHAT }}
         run: |
+          # Which bot the TELEGRAM_BOT_TOKEN secret belongs to (to rule out a token for a different bot).
+          curl -s "https://api.telegram.org/bot${TOKEN}/getMe" | python3 -c "import json,sys;r=json.load(sys.stdin).get('result',{});print('bot: @'+str(r.get('username')))"
           curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${CHAT}" --data-urlencode "text=🩺 Source watcher is connected. Daily reports will arrive here." \
             | python3 -c "import json,sys;d=json.load(sys.stdin);print('ok:',d.get('ok'),d.get('description',''));sys.exit(0 if d.get('ok') else 1)"
