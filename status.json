@@ -8,7 +8,7 @@
   "title": "兰香如故",
   "link": "爱瓜TV Aigua (M3U8)",
   "http": 200,
-  "seconds": 9,
+  "seconds": 12,
   "log": [
    "7 titles listed"
   ],
@@ -20,7 +20,7 @@
   "status": "playable",
   "stage": "done",
   "detail": "",
-  "title": "Divine Manifestation",
+  "title": "Eclipse of Illusion SP: The Miasma War",
   "link": "AniKoto CS (M3U8)",
   "http": 200,
   "seconds": 6,
@@ -35,7 +35,7 @@
   "status": "playable",
   "stage": "done",
   "detail": "",
-  "title": "Divine Manifestation",
+  "title": "Eclipse of Illusion SP: The Miasma War",
   "link": "AnimeSuge CS (M3U8)",
   "http": 200,
   "seconds": 5,
@@ -53,7 +53,7 @@
   "title": "My Secret Billionaire Mom",
   "link": "ChartDrama Shorts (VIDEO)",
   "http": 200,
-  "seconds": 3,
+  "seconds": 2,
   "log": [
    "23 titles listed"
   ],
@@ -68,7 +68,7 @@
   "title": "峡湾",
   "link": "磁力熊 Cilixiong: magnet/torrent (not test-played)",
   "http": 200,
-  "seconds": 3,
+  "seconds": 6,
   "log": [
    "17 titles listed"
   ],
@@ -77,38 +77,30 @@
  "Cinejoy": {
   "module": "Cinejoy",
   "site": "https://cinejoy.pk",
-  "status": "up",
-  "stage": "play",
-  "detail": "Street Fighter: no links found (https://cinejoy.pk/watch/movie/1153576)",
-  "title": null,
-  "link": null,
+  "status": "playable",
+  "stage": "done",
+  "detail": "",
+  "title": "Avengers: Doomsday",
+  "link": "Cinejoy CS (M3U8)",
   "http": 200,
-  "seconds": 6,
+  "seconds": 3,
   "log": [
-   "21 titles listed",
-   "Avengers: Doomsday: no links found (https://cinejoy.pk/watch/movie/1003596)",
-   "The Hunger Games: Sunrise on the Reaping: no links found (https://cinejoy.pk/watch/movie/1300968)",
-   "The Odyssey: no links found (https://cinejoy.pk/watch/movie/1368337)",
-   "Street Fighter: no links found (https://cinejoy.pk/watch/movie/1153576)"
+   "21 titles listed"
   ],
   "date": "2026-11-28"
  },
  "Crackle": {
   "module": "Crackle",
   "site": "https://crackle.beauty",
-  "status": "up",
-  "stage": "play",
-  "detail": "The Mosquito Bowl: no links found (https://crackle.beauty/play/movie/1458300)",
-  "title": null,
-  "link": null,
+  "status": "playable",
+  "stage": "done",
+  "detail": "",
+  "title": "Street Fighter",
+  "link": "Crackle (M3U8)",
   "http": 200,
-  "seconds": 4,
+  "seconds": 11,
   "log": [
-   "14 titles listed",
-   "Street Fighter: no links found (https://crackle.beauty/play/movie/1153576)",
-   "Blade Runner 2099: no links found (https://crackle.beauty/play/tv/171802/1/1)",
-   "The Hunchback, Soul of Paris: no links found (https://crackle.beauty/play/movie/1480665)",
-   "The Mosquito Bowl: no links found (https://crackle.beauty/play/movie/1458300)"
+   "14 titles listed"
   ],
   "date": "2026-11-28"
  },
@@ -121,7 +113,7 @@
   "title": "仙逆",
   "link": "CN影院 Csxyy (M3U8)",
   "http": 200,
-  "seconds": 5,
+  "seconds": 7,
   "log": [
    "12 titles listed"
   ],
@@ -136,7 +128,7 @@
   "title": "欢迎来龙餐馆",
   "link": "黑夜影院 Darkvod (M3U8)",
   "http": 200,
-  "seconds": 8,
+  "seconds": 9,
   "log": [
    "13 titles listed"
   ],
@@ -151,7 +143,7 @@
   "title": "镖人：风起大漠",
   "link": "低端影视 ddys (M3U8)",
   "http": 200,
-  "seconds": 12,
+  "seconds": 8,
   "log": [
    "25 titles listed"
   ],
@@ -163,10 +155,10 @@
   "status": "playable",
   "stage": "done",
   "detail": "",
-  "title": "提欧奥特曼",
+  "title": "炼气十万年",
   "link": "233动漫 Dm233 (M3U8)",
   "http": 200,
-  "seconds": 3,
+  "seconds": 7,
   "log": [
    "19 titles listed"
   ],
@@ -200,7 +192,7 @@
   "title": "Let the Sea Breeze Embrace You for Me",
   "link": "DramaFren (VIDEO)",
   "http": 200,
-  "seconds": 5,
+  "seconds": 7,
   "log": [
    "41 titles listed"
   ],
@@ -242,19 +234,15 @@
  "Flixvision": {
   "module": "Flixvision",
   "site": "https://flixvision.st",
-  "status": "up",
-  "stage": "play",
-  "detail": "The Hunger Games..: 1 link(s), none played. FlixVision: playlist HTTP 403",
-  "title": null,
-  "link": null,
+  "status": "playable",
+  "stage": "done",
+  "detail": "",
+  "title": "Street Fighter",
+  "link": "FlixVision (M3U8)",
   "http": 200,
-  "seconds": 16,
+  "seconds": 7,
   "log": [
-   "25 titles listed",
-   "Street Fighter: 8 link(s), none played. FlixVision: playlist HTTP 403",
-   "Blade Runner 2099: 8 link(s), none played. FlixVision: playlist HTTP 403",
-   "The Mosquito Bowl: 6 link(s), none played. FlixVision: playlist HTTP 403",
-   "The Hunger Games..: 1 link(s), none played. FlixVision: playlist HTTP 403"
+   "25 titles listed"
   ],
   "date": "2026-11-28"
  },
@@ -267,7 +255,7 @@
   "title": "7 Dogs",
   "link": "4KHDHub CS (VIDEO)",
   "http": 200,
-  "seconds": 3,
+  "seconds": 4,
   "log": [
    "19 titles listed"
   ],
@@ -282,7 +270,7 @@
   "title": "The Hunger Games: Sunrise on the Reaping",
   "link": "frameXTV (M3U8)",
   "http": 200,
-  "seconds": 26,
+  "seconds": 24,
   "log": [
    "19 titles listed"
   ],
@@ -313,10 +301,10 @@
   "status": "playable",
   "stage": "done",
   "detail": "",
-  "title": "璀璨之城(粤)",
+  "title": "黑鸽第2季",
   "link": "华视界 Haotv (M3U8)",
   "http": 200,
-  "seconds": 2,
+  "seconds": 6,
   "log": [
    "12 titles listed"
   ],
@@ -331,7 +319,7 @@
   "title": "仙逆",
   "link": "华人影院 Huarw (M3U8)",
   "http": 200,
-  "seconds": 5,
+  "seconds": 4,
   "log": [
    "12 titles listed"
   ],
@@ -340,15 +328,15 @@
  "Huavod": {
   "module": "Huavod",
   "site": "https://huavod.com",
-  "status": "down",
-  "stage": "home",
-  "detail": "IllegalStateException: home page and search returned nothing",
-  "title": null,
-  "link": null,
-  "http": 403,
-  "seconds": 2,
+  "status": "playable",
+  "stage": "done",
+  "detail": "",
+  "title": "给阿嬷的情书",
+  "link": "华视影院 Huavod (M3U8)",
+  "http": 200,
+  "seconds": 25,
   "log": [
-   "failed at home: IllegalStateException: home page and search returned nothing"
+   "41 titles listed"
   ],
   "date": "2026-11-28"
  },
@@ -361,7 +349,7 @@
   "title": "两京十五日",
   "link": "看看鸭 Kankanya (VIDEO)",
   "http": 200,
-  "seconds": 8,
+  "seconds": 4,
   "log": [
    "16 titles listed"
   ],
@@ -385,19 +373,16 @@
  "Kisskh": {
   "module": "Kisskh",
   "site": "https://kisskh.co",
-  "status": "down",
-  "stage": "home",
-  "detail": "IllegalStateException: home page and search returned nothing",
-  "title": null,
-  "link": null,
-  "http": 403,
-  "seconds": 1,
+  "status": "playable",
+  "stage": "done",
+  "detail": "",
+  "title": "The Remarried Empress",
+  "link": "Kisskh Asia (M3U8)",
+  "http": 200,
+  "seconds": 3,
   "log": [
-   "home 'Latest Updates': ErrorLoadingException: Kisskh answered HTTP 403",
-   "home 'Popular': ErrorLoadingException: Kisskh answered HTTP 403",
-   "home 'Korean Dramas': ErrorLoadingException: Kisskh answered HTTP 403",
-   "search: ErrorLoadingException: Kisskh answered HTTP 403",
-   "failed at home: IllegalStateException: home page and search returned nothing"
+   "41 titles listed",
+   "The Melody of Love (2026): 1 link(s), none played. Kisskh Asia: video returned a web page"
   ],
   "date": "2026-11-28"
  },
@@ -410,7 +395,7 @@
   "title": "可能的爱",
   "link": "可可影视 Kkys (M3U8)",
   "http": 850,
-  "seconds": 5,
+  "seconds": 4,
   "log": [
    "9 titles listed"
   ],
@@ -425,7 +410,7 @@
   "title": "两京十五日",
   "link": "看片狂人 Kpkuang (M3U8)",
   "http": 200,
-  "seconds": 18,
+  "seconds": 15,
   "log": [
    "95 titles listed",
    "死灵法师！我即是天灾动漫: ErrorLoadingException: 找不到影片标题",
@@ -442,7 +427,7 @@
   "title": null,
   "link": null,
   "http": 200,
-  "seconds": 1,
+  "seconds": 2,
   "log": [
    "home '电影 · 热播': JsonParseException: Unexpected character ('<' (code 60)): expected a valid value (JSON String, Number, Array, Object or token 'null', 'true' or 'false')  at [Source: (String)\"<!DOCTYPE",
    "home '电影 · 最新添加': JsonParseException: Unexpected character ('<' (code 60)): expected a valid value (JSON String, Number, Array, Object or token 'null', 'true' or 'false')  at [Source: (String)\"<!DOCTY",
@@ -476,7 +461,7 @@
   "title": "Ando TV",
   "link": "直播 Live TV (M3U8)",
   "http": 200,
-  "seconds": 4,
+  "seconds": 5,
   "log": [
    "41 titles listed"
   ],
@@ -504,19 +489,16 @@
  "Movy": {
   "module": "Movy",
   "site": "https://www.movy.sx",
-  "status": "up",
-  "stage": "play",
-  "detail": "The Odyssey: no links found (https://www.movy.sx/movie/1368337)",
-  "title": null,
-  "link": null,
+  "status": "playable",
+  "stage": "done",
+  "detail": "",
+  "title": "Blade Runner 2099",
+  "link": "Movy (M3U8)",
   "http": 200,
-  "seconds": 2,
+  "seconds": 12,
   "log": [
    "21 titles listed",
-   "Avengers: Doomsday: no links found (https://www.movy.sx/movie/1003596)",
-   "Blade Runner 2099: no links found (https://www.movy.sx/tv/171802?s=1&e=1)",
-   "The Hunger Games: Sunrise on the Reaping: no links found (https://www.movy.sx/movie/1300968)",
-   "The Odyssey: no links found (https://www.movy.sx/movie/1368337)"
+   "Avengers: Doomsday: no links found (https://www.movy.sx/movie/1003596)"
   ],
   "date": "2026-11-28"
  },
@@ -529,7 +511,7 @@
   "title": "菲托·帕兹：歌中的世界",
   "link": "母鸡资源 Mujizy (M3U8)",
   "http": 200,
-  "seconds": 4,
+  "seconds": 3,
   "log": [
    "21 titles listed"
   ],
@@ -538,15 +520,15 @@
  "Mvffm": {
   "module": "Mvffm",
   "site": "https://www.mvffm.net",
-  "status": "down",
-  "stage": "home",
-  "detail": "IllegalStateException: home page and search returned nothing",
-  "title": null,
-  "link": null,
-  "http": 403,
-  "seconds": 1,
+  "status": "playable",
+  "stage": "done",
+  "detail": "",
+  "title": "飢餓遊戲1",
+  "link": "Movieffm (M3U8)",
+  "http": 200,
+  "seconds": 11,
   "log": [
-   "failed at home: IllegalStateException: home page and search returned nothing"
+   "42 titles listed"
   ],
   "date": "2026-11-28"
  },
@@ -559,7 +541,7 @@
   "title": null,
   "link": null,
   "http": 200,
-  "seconds": 43,
+  "seconds": 41,
   "log": [
    "69 titles listed",
    "两京十五日: SocketTimeoutException: timeout",
@@ -578,7 +560,7 @@
   "title": "偷天游戏",
   "link": "泥巴影院 Nbyy (M3U8)",
   "http": 200,
-  "seconds": 3,
+  "seconds": 8,
   "log": [
    "49 titles listed"
   ],
@@ -608,7 +590,7 @@
   "title": "弗兰肯斯坦",
   "link": "奈飞工厂 Netflixgc (M3U8)",
   "http": 200,
-  "seconds": 4,
+  "seconds": 5,
   "log": [
    "8 titles listed"
   ],
@@ -623,7 +605,7 @@
   "title": "孤注一掷",
   "link": "欧乐影院 Olevod (M3U8)",
   "http": 200,
-  "seconds": 4,
+  "seconds": 7,
   "log": [
    "21 titles listed"
   ],
@@ -638,7 +620,7 @@
   "title": "Police in Love",
   "link": "OneTouchTV Asia (M3U8)",
   "http": 200,
-  "seconds": 1,
+  "seconds": 2,
   "log": [
    "6 titles listed"
   ],
@@ -653,7 +635,7 @@
   "title": null,
   "link": null,
   "http": 403,
-  "seconds": 91,
+  "seconds": 90,
   "log": [
    "home '七味推荐': TimeoutCancellationException: Timed out waiting for 90000 ms",
    "home '最新电影': TimeoutCancellationException: Timed out waiting for 90000 ms",
@@ -669,10 +651,10 @@
   "status": "playable",
   "stage": "done",
   "detail": "",
-  "title": "Dirty Session",
+  "title": "Fake Girlfriend Meets the Real Fiancée",
   "link": "ReelFren Shorts (M3U8)",
   "http": 403,
-  "seconds": 8,
+  "seconds": 1,
   "log": [
    "41 titles listed"
   ],
@@ -687,7 +669,7 @@
   "title": "Street Fighter",
   "link": "Rivestream hera (M3U8)",
   "http": 200,
-  "seconds": 19,
+  "seconds": 10,
   "log": [
    "21 titles listed",
    "Avengers: Doomsday: 1 link(s), none played. Rivestream eon: video HTTP 404"
@@ -703,7 +685,7 @@
   "title": "Avengers: Doomsday",
   "link": "Rivo (M3U8)",
   "http": 200,
-  "seconds": 19,
+  "seconds": 5,
   "log": [
    "21 titles listed"
   ],
@@ -718,7 +700,7 @@
   "title": "两京十五日",
   "link": "随便看 Suikan (M3U8)",
   "http": 200,
-  "seconds": 5,
+  "seconds": 4,
   "log": [
    "7 titles listed"
   ],
@@ -727,15 +709,15 @@
  "Trjvod": {
   "module": "Trjvod",
   "site": "https://www.trjvod.com",
-  "status": "down",
-  "stage": "home",
-  "detail": "IllegalStateException: home page and search returned nothing",
-  "title": null,
-  "link": null,
-  "http": 403,
-  "seconds": 1,
+  "status": "playable",
+  "stage": "done",
+  "detail": "",
+  "title": "独步逍遥",
+  "link": "唐人街 Trjvod (M3U8)",
+  "http": 200,
+  "seconds": 15,
   "log": [
-   "failed at home: IllegalStateException: home page and search returned nothing"
+   "12 titles listed"
   ],
   "date": "2026-11-28"
  },
@@ -748,7 +730,7 @@
   "title": "2022央视春节联欢晚会",
   "link": "优视频 UVOD (M3U8)",
   "http": 200,
-  "seconds": 3,
+  "seconds": 4,
   "log": [
    "7 titles listed"
   ],
@@ -763,7 +745,7 @@
   "title": "哪吒之魔童闹海",
   "link": "小宝影院 Xiaobao (M3U8)",
   "http": 200,
-  "seconds": 6,
+  "seconds": 5,
   "log": [
    "49 titles listed"
   ],
@@ -778,7 +760,7 @@
   "title": "The Odyssey",
   "link": "ZXCStream CS (M3U8)",
   "http": 200,
-  "seconds": 35,
+  "seconds": 17,
   "log": [
    "21 titles listed",
    "Avengers: Doomsday: no links found (https://zxcstream.com/watch/movie/1003596)",

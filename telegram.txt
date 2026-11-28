@@ -1,0 +1,16 @@
+🩺 Source check 2026-11-28
+✅ 42 play · 🟡 3 unverified · ⚠️ 2 no video · ❌ 2 down
+
+Working again:
+✅ Cinejoy CS
+✅ Crackle
+✅ FlixVision
+✅ 华视影院 Huavod
+✅ Kisskh Asia
+✅ Movy
+✅ Movieffm
+✅ 唐人街 Trjvod
+
+Still broken: Donghuastream CS, DramaTip Shorts, 酷播 Kubb, 南瓜影视 Nangua
+
+https://github.com/Latrixz/cloudstream-asian/blob/watch/README.md
